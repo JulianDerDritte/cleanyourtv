@@ -68,6 +68,7 @@ updated. Add-ons with custom shell installers still need Bash; this native Windo
 | `stockholm/` | Riddarfjärden from Södermalm, drawn in code by `make_wallpapers.py` (CC0): Stadshuset with its three crowns, Riddarholmen's openwork spire, Gamla stan and the Royal Palace in eight lights, from dawn, morning mist, golden hour and blue hour to a moonlit night, the northern lights, a snowy winter night and a midsummer night. `wallpaper_moods` shows the morning pictures in the morning, golden and blue hour in the evening and the night ones after dark, a new one every 20 minutes with its name under the buttons; a frosted-glass dock, round icon-only buttons, no hero name over the skyline, and the clock screensaver over the picture after five idle minutes | <img src="stockholm/screenshot.jpg" width="320" alt="stockholm theme"> |
 | `aerial/` | Inspired by Apple TV's Aerial screensavers: ten photos NASA astronauts took from the International Space Station (aurora over Scandinavia, sunrise over northern Europe, an orbital sunset, the Nile at night, Moscow under the Moon), shuffled every 15 minutes with the place and expedition under the buttons, on pure black with a frosted-glass dock and round icon-only buttons. Back on Home opens the clock over the photo, as Menu does on an Apple TV, and so do three idle minutes. The photos are public domain, not MIT: see `aerial/CREDITS.md` | <img src="aerial/screenshot.jpg" width="320" alt="aerial theme"> |
 | `twilight/` | Three original anime landscape wallpapers in `wallpapers/` (Mount Fuji twilight, seaside coastal train, ancient stone arch), rotating with caption under the buttons; frosted-glass dock at 60% opacity, ambient glow disabled so the artwork stays calm. See `twilight/CREDITS.md` | <img src="twilight/screenshot.jpg" width="320" alt="twilight theme"> |
+| `sony-bravia-de/` | Home as a circle of white app symbols on the left (`list_mode`, `circle_list`) with Netflix, YouTube, Tagesschau and Prime Video first, the Sony service apps and a few streaming apps kept off Home, the app library on and the ARD Mediathek named in full. Tested only on two Sony BRAVIA sets (Android TV 12); no wallpaper | <img src="sony-bravia-de/screenshot.jpg" width="320" alt="sony-bravia-de theme"> |
 
 Every theme folder has a `screenshot.jpg` of Home with that theme on a real TV. `tools/theme.sh` never
 pushes it; it is only here so you can see a theme before you try it.
@@ -303,7 +304,7 @@ Open a PR with a new folder here containing:
 Then add a row to the table above with the screenshot, the same way as the others, and bump the count in
 the Themes feature row of every front page that states it: `README.md` (the `N ship in themes/` sentence),
 `README.de.md`, `README.nl.md`, `README.uk.md`, `README.tr.md`, `README.pt-BR.md`, `README.he.md`, `README.uz.md`,
-`README.fr.md` and `README.es.md` (the last six in digits), each in its own words. Those ten pages are the ones that state
+`README.fr.md` and `README.es.md` (the last ten in digits, every one of them now that the count is past thirty), each in its own words. Those ten pages are the ones that state
 it today rather than the rule: `tests/test_readme_theme_count.py` counts the folders here that carry a
 `config.json` and fails on a page whose number is not that count, naming the page, so its list is the one
 a page that starts stating the count joins.

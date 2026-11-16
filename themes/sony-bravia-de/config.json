@@ -1,0 +1,29 @@
+{
+  "dock_apps": ["com.netflix.ninja", "com.google.android.youtube.tv", "de.tagesschau", "com.amazon.amazonvideo.livingroom"],
+  "hidden_apps": [
+    "com.mediatek.wwtv.tvcenter",
+    "com.mitv.gallery",
+    "com.disney.disneyplus",
+    "de.sky.online",
+    "de.swr.avp.ard.tv",
+    "com.zdf.android.mediathek",
+    "com.valvesoftware.steamlink",
+    "com.ted.android.tv",
+    "com.android.vending",
+    "com.sony.dtv.tvx",
+    "com.sony.dtv.calibrationmonitor",
+    "com.sony.dtv.ecodashboard",
+    "com.sony.dtv.notificationcenter",
+    "com.sony.dtv.recapp",
+    "com.sony.dtv.seeds.iot",
+    "com.sony.dtv.smartmediaapp",
+    "com.sony.dtv.timers",
+    "com.vewd.core.integration.dia"
+  ],
+  "live_tv_package": "com.sony.dtv.tvx",
+  "app_library": true,
+  "library_ok_opens": true,
+  "list_mode": true,
+  "circle_list": true,
+  "app_labels": ["de.swr.avp.ard.tv=ARD Mediathek"]
+}
