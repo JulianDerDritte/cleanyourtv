@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- A row of the settings screens: focus is the white fill of the menus and pills (input_row_bg, pill_bg) with dark text
+     (pill_text); "selected" (the active option of a row) is the green frame, and both together are the white fill with
+     the green frame. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#F5FFFFFF" />
+            <corners android:radius="14dp" />
+            <stroke android:width="2dp" android:color="#FF4DAE6D" />
+        </shape>
+    </item>
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <solid android:color="#5574A987" />
+            <solid android:color="#F5FFFFFF" />
             <corners android:radius="14dp" />
-            <stroke android:width="2dp" android:color="#FFB9E7C7" />
         </shape>
     </item>
     <item android:state_selected="true">

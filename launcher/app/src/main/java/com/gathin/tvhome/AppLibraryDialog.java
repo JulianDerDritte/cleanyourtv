@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -45,9 +46,13 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /** On-demand installed-app picker. Uses the launcher's glass resources; no backdrop capture or blur. */
 final class AppLibraryDialog {
+    /** The corners of an app card: the 14 dp of the rows and cards inside a panel. */
+    static final int CARD_RADIUS_DP = 14;
+
     /**
      * The catalogue, the labels and the icons load here, off the UI thread: each label and icon opens the app's
      * resources, and on a TCL G09 that froze Home for 60-140 ms (2 to 4 janky frames) every time the library opened.
@@ -147,7 +152,19 @@ final class AppLibraryDialog {
      *  setups are unaffected. See LibraryApps.excludedFromCatalog(). */
     private final Set<String> excludedApps;
 
-    AppLibraryDialog(Activity activity, boolean animations, boolean reducedMotion, boolean selectionMode, boolean okOpens, Predicate<String> onHome, Runnable changed, Runnable dismissed, Set<String> excludedApps) {
+    /** list_mode without the selection mode: the library keeps the owner's order and offers "Move" (LibraryOrder). */
+    private final boolean listOrder;
+    /** The packages in the order Home shows them (AppAdapter.packagesInOrder); the chosen apps follow it. */
+    private final Supplier<List<String>> homeOrder;
+    /** A move in progress: the window that takes the keys and the order it started from. */
+    private LibraryOrder.MoveSession moveSession;
+    private String movePackage;
+    private int moveBlock;
+
+    AppLibraryDialog(Activity activity, boolean animations, boolean reducedMotion, boolean selectionMode, boolean okOpens, Predicate<String> onHome, Runnable changed, Runnable dismissed, Set<String> excludedApps,
+                     boolean listMode, Supplier<List<String>> homeOrder) {
+        this.listOrder = LibraryOrder.useListOrder(listMode, selectionMode);
+        this.homeOrder = homeOrder;
         this.activity = activity;
         this.animations = animations;
         this.rtl = activity.getResources().getBoolean(R.bool.rtl_app_grid);
@@ -281,6 +298,27 @@ final class AppLibraryDialog {
         }
         catalogTime = System.currentTimeMillis();
         Collator collator = Collator.getInstance();
+        if (listOrder) {
+            // list_mode: not chosen first (the owner's order, then the rest by name), the chosen last in Home's order.
+            apps.sort((a, b) -> {
+                int byLabel = collator.compare(label(a), label(b));
+                return byLabel != 0 ? byLabel : a.activityInfo.packageName.compareTo(b.activityInfo.packageName);
+            });
+            List<String> byName = new ArrayList<>();
+            Set<String> chosen = new HashSet<>();
+            Map<String, ResolveInfo> byPackage = new HashMap<>();
+            for (ResolveInfo app : apps) {
+                String pkg = app.activityInfo.packageName;
+                byName.add(pkg);
+                byPackage.put(pkg, app);
+                if (home.get(pkg)) chosen.add(pkg);
+            }
+            List<ResolveInfo> arranged = new ArrayList<>();
+            for (String pkg : LibraryOrder.arrange(byName, chosen, savedOrder(), homeOrder.get())) arranged.add(byPackage.get(pkg));
+            apps = arranged;
+            showCatalog();
+            return;
+        }
         apps.sort((a, b) -> {
             String pa = a.activityInfo.packageName, pb = b.activityInfo.packageName;
             if (selectionMode) return LibraryApps.compareCatalog(home.get(pa), label(a), pa,
@@ -449,7 +487,142 @@ final class AppLibraryDialog {
         });
     }
 
+    // ---- list_mode: the owner's order of the apps not on Home (LibraryOrder) ----------------------------------
+
+    private SharedPreferences settings() {
+        return activity.getSharedPreferences(Config.SETTINGS_NAME, Activity.MODE_PRIVATE);
+    }
+
+    private List<String> savedOrder() {
+        return LibraryOrder.decode(settings().getString(Config.LIBRARY_ORDER_KEY, ""));
+    }
+
+    /** Writes the order; false when the write failed (the caller shows library_save_failed and stops). */
+    private boolean saveOrder(List<String> order) {
+        if (order.equals(savedOrder())) return true;
+        return settings().edit().putString(Config.LIBRARY_ORDER_KEY, LibraryOrder.encode(order)).commit();
+    }
+
+    /** The packages in the order the library shows them now. */
+    private List<String> shownOrder() {
+        List<String> order = new ArrayList<>();
+        for (ResolveInfo app : apps) order.add(app.activityInfo.packageName);
+        return order;
+    }
+
+    /** The shown packages that are not on Home, in the order shown: the block the owner may reorder. */
+    private List<String> shownNotChosen() {
+        List<String> order = new ArrayList<>();
+        for (ResolveInfo app : apps) if (!onHome.test(app.activityInfo.packageName)) order.add(app.activityInfo.packageName);
+        return order;
+    }
+
+    /** What choosing or un-choosing does to the saved order (K7 b): a chosen app leaves it, an un-chosen one goes last. */
+    private boolean saveOrderAfterChange(String pkg, boolean add) {
+        return saveOrder(add ? LibraryOrder.afterChosen(savedOrder(), pkg) : LibraryOrder.afterRemoved(shownNotChosen(), pkg));
+    }
+
+    /** Shows {@code order} in the catalogue: the same apps, new places. */
+    private void showOrder(List<String> order) {
+        Map<String, ResolveInfo> byPackage = new HashMap<>();
+        for (ResolveInfo app : apps) byPackage.put(app.activityInfo.packageName, app);
+        List<ResolveInfo> next = new ArrayList<>();
+        for (String pkg : order) next.add(byPackage.get(pkg));
+        apps = next;
+    }
+
+    private void startMove(ResolveInfo app) {
+        dismissActions();
+        movePackage = app.activityInfo.packageName;
+        selectedPackage = movePackage;
+        moveBlock = shownNotChosen().size();
+        moveSession = new LibraryOrder.MoveSession(shownOrder());
+        View content = text(activity.getString(R.string.library_move_hint), 17, Color.WHITE);
+        content.setPadding(dp(16), dp(12), dp(16), dp(12));
+        content.setBackground(surface(0xF0202020, 14));
+        content.setFocusableInTouchMode(true);
+        PopupWindow window = new PopupWindow(content, Math.max(dp(240), panel.getWidth()), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        actionPopup = window;
+        window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        window.setOutsideTouchable(false);
+        window.setAnimationStyle(0);
+        window.setElevation(0f);
+        window.setOnDismissListener(() -> {
+            if (actionPopup == window) actionPopup = null;
+            // Outside the "if": dismissActions() has cleared actionPopup before this runs, and it must still end the move.
+            endMove();
+            restoreCardFocus();
+        });
+        content.setOnKeyListener((v, key, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+            if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                stepMove(LibraryOrder.deltaForKey(key == KeyEvent.KEYCODE_DPAD_LEFT, rtl));
+                return true;
+            }
+            if (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN) return true;
+            if (key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER || key == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                confirmMove(window);
+                return true;
+            }
+            return false;
+        });
+        window.showAsDropDown(panel, 0, dp(10));
+        content.requestFocus();
+    }
+
+    private void stepMove(int delta) {
+        LibraryOrder.MoveSession session = moveSession;
+        if (session == null || catalog == null) return;
+        int before = LibraryOrder.indexOf(session.current(), movePackage);
+        int after = session.move(movePackage, moveBlock, delta);
+        if (after == before) return;
+        showOrder(session.current());
+        selectedPosition = after;
+        RecyclerView list = catalog;
+        list.getAdapter().notifyItemMoved(before, after);
+        list.scrollToPosition(after);
+        list.post(() -> {
+            if (catalog != list) return;
+            RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(after);
+            if (holder != null) highlight(holder.itemView, true);
+        });
+    }
+
+    private void confirmMove(PopupWindow window) {
+        LibraryOrder.MoveSession session = moveSession;
+        if (session == null) return;
+        List<String> block = new ArrayList<>(session.current().subList(0, moveBlock));
+        if (!saveOrder(block)) {
+            // Not confirmed: closing the window now puts the old order back.
+            Toast.makeText(activity, R.string.library_save_failed, Toast.LENGTH_LONG).show();
+            window.dismiss();
+            return;
+        }
+        session.confirm();
+        window.dismiss();
+    }
+
+    /** The window closed (OK, Back, or the library closing): show what the session says, confirmed or the old order. */
+    private void endMove() {
+        LibraryOrder.MoveSession session = moveSession;
+        moveSession = null;
+        if (session == null) return;
+        List<String> order = session.cancel();
+        if (closed || catalog == null) return;
+        // Only the moved app can have changed its place: one move event, from where it stands now to where it belongs.
+        int from = LibraryOrder.indexOf(shownOrder(), movePackage);
+        int to = LibraryOrder.indexOf(order, movePackage);
+        showOrder(order);
+        selectedPosition = Math.max(0, to);
+        if (from >= 0 && to >= 0 && from != to) catalog.getAdapter().notifyItemMoved(from, to);
+        catalog.scrollToPosition(selectedPosition);
+    }
+
     private void changeHome(ResolveInfo app, boolean add) {
+        if (listOrder && !saveOrderAfterChange(app.activityInfo.packageName, add)) {
+            Toast.makeText(activity, R.string.library_save_failed, Toast.LENGTH_LONG).show();
+            return;
+        }
         if (!LibraryApps.save(activity, app.activityInfo.packageName, add)) {
             Toast.makeText(activity, R.string.library_save_failed, Toast.LENGTH_LONG).show();
             return;
@@ -539,6 +712,8 @@ final class AppLibraryDialog {
         boolean home = onHome.test(pkg);
         addAction(rows, home ? R.string.library_remove_shortcut : R.string.library_add_home,
                 () -> changeHome(app, !home));
+        // Only an app not on Home can be moved, and only when there is another one to pass.
+        if (listOrder && !home && shownNotChosen().size() >= 2) addAction(rows, R.string.library_move, () -> startMove(app));
         Intent info = SystemSettings.appInfo(activity, pkg);
         if (info != null) addAction(rows, R.string.library_app_info, () -> {
             close();
@@ -655,7 +830,7 @@ final class AppLibraryDialog {
             boolean recent = !selectionMode && LibraryApps.recent(installTimes.getOrDefault(pkg, 0L), catalogTime);
             status.setText(home ? R.string.library_on_home : recent ? R.string.library_recent : R.string.library_add_home);
             status.setVisibility(home || !okOpens ? View.VISIBLE : View.INVISIBLE);
-            holder.itemView.setBackground(surface(home ? 0x1475BBA4 : 0x0CFFFFFF, 18));
+            holder.itemView.setBackground(surface(home ? 0x1475BBA4 : 0x0CFFFFFF, CARD_RADIUS_DP));
             View check = holder.itemView.findViewById(R.id.dot);
             check.getLayoutParams().width = dp(home ? 18 : 8);
             check.getLayoutParams().height = dp(home ? 18 : 8);

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- list_mode symbol: TED, white.
+     Package: com.ted.android.tv
+     Source: Simple Icons 16.36.0, icons/ted.svg
+     License: CC0 1.0 (Simple Icons)
+     Size is the size it is drawn at, so the ImageView centres it and does not scale it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="17.344dp"
+    android:viewportWidth="24"
+    android:viewportHeight="8.672">
+    <group
+        android:translateX="0"
+        android:translateY="-7.664">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M0 7.664 v2.223 h2.43 v6.449 H5.1 v-6.45 h2.43 V7.665 z M7.945 7.664 v8.672 h7.31 v-2.223 h-4.638 v-1.08 h4.637 v-2.066 h-4.637 v-1.08 h4.637 V7.664 z M15.704 7.664 v8.672 h3.863 c3.024 0 4.433 -1.688 4.433 -4.349 0 -2.185 -1.021 -4.323 -3.912 -4.323 z M18.376 9.887 h0.85 c1.931 0 2.102 1.518 2.102 2.063 0 0.815 -0.243 2.163 -1.907 2.163 h-1.045 z" />
+    </group>
+</vector>

@@ -42,6 +42,13 @@ final class Config {
     static final String SETTINGS_NAME = "launcher_settings";
     static final String ROWS_BELOW_DOCK_KEY = "rows_below_dock";
     static final String WALLPAPER_CHOICE_KEY = "wallpaper_choice";
+    /** list_mode: the Wallpaper window's tick "Random abspielen" (present only while it is on). */
+    static final String WALLPAPER_RANDOM_KEY = "wallpaper_random";
+    /**
+     * list_mode: the owner's order of the apps not on Home in the app library (LibraryOrder.encode). Deliberately NOT in
+     * removeThemeChoices or hasOnTvChoices: a theme push does not take it back, and sorting alone does not offer "Theme default".
+     */
+    static final String LIBRARY_ORDER_KEY = "library_order";
     static final String DOCK_OPACITY_KEY = "dock_opacity";
     static final String CLOCK_FORMAT_KEY = "clock_format";
     /**
@@ -283,6 +290,10 @@ final class Config {
     final boolean singleRow;
     /** With single_row, the band runs behind every app in the row, not only the dock apps (config.xml, dock_band_all). */
     final boolean dockBandAll;
+    /** Home as one vertical list of names instead of tiles (config.xml, list_mode); the layout values it forces are already applied. */
+    final boolean listMode;
+    /** The circle list inside list_mode (config.xml, circle_list); true only together with list_mode (ListMode.circleActive). */
+    final boolean circleList;
 
     private Config(List<String> dockApps, boolean fillDock, List<String> hiddenApps, List<String> libraryApps, List<String> libraryExcludedApps, String liveTvPackage,
                    String liveTvAction, String liveTvInputId, Map<String, String> launchActions, Map<String, String> appLabels,
@@ -299,9 +310,11 @@ final class Config {
                    boolean handleViewInputs, boolean tileMenu, boolean dockEvenPadding, boolean dockBand, boolean cinematicDots, boolean cinematicWhiteFocus, boolean wifiStatusColor, int cinematicScrim, int cinematicArt,
                    Map<String, Set<String>> wallpaperMoods, boolean gamepadPassthrough, boolean consumeVolumeKeys, boolean volumePausesFilter, boolean homeIgnoreChannelKeys, boolean powerOnHome, boolean homeLongPressHome, boolean wifiStatusWarnings, List<String> topBarApps, boolean showGreeting, boolean headerWhite, boolean clockWallpaper, int clockWallpaperDim, boolean clockGlow, String glassStyle, boolean singleRow, boolean dockBandAll, boolean lunarDate, int lunarUtcOffset, boolean dateBelowClock, boolean vpnPill, String locale, boolean powerOnHomeAlways, boolean inputsConnectedOnly, boolean inputsCecStateOnly,
                    int openOnStartNetworkWait, boolean openOnStartOnWake, boolean iconOnlyVpn, String clockFormat, boolean backOpensClock, boolean glowSnap,
-                   boolean settingsKeyClearTask) {
+                   boolean settingsKeyClearTask, boolean listMode, boolean circleList) {
+        this.listMode = listMode;
+        this.circleList = ListMode.circleActive(listMode, circleList);
         this.handleViewInputs = handleViewInputs;
-        this.tileMenu = tileMenu;
+        this.tileMenu = ListMode.circleTileMenu(tileMenu, listMode, circleList);
         this.inputKeycodes = inputKeycodes;
         this.appKeys = Collections.unmodifiableList(appKeys);
         this.keyFilter = keyFilter;
@@ -550,6 +563,8 @@ final class Config {
         String glassStyle = res.getString(R.string.glass_style);
         boolean singleRow = res.getBoolean(R.bool.single_row);
         boolean dockBandAll = res.getBoolean(R.bool.dock_band_all);
+        boolean listMode = res.getBoolean(R.bool.list_mode);
+        boolean circleList = res.getBoolean(R.bool.circle_list);
         boolean applied = false;
 
         File dir = dir(ctx);
@@ -665,10 +680,27 @@ final class Config {
             clockWallpaperDim = integer(json, "clock_wallpaper_dim", clockWallpaperDim, 0, 90);
             clockGlow = bool(json, "clock_glow", clockGlow);
             singleRow = bool(json, "single_row", singleRow);
+            listMode = bool(json, "list_mode", listMode);
+            circleList = bool(json, "circle_list", circleList);
             dockBandAll = bool(json, "dock_band_all", dockBandAll);
             glowStyle = string(json, "glow_style", glowStyle);
             glassStyle = string(json, "glass_style", glassStyle);
         }
+        // list_mode forces its top bar here, before the top-bar apps leave the grid: with a theme's own top bar values
+        // (a top menu, more pills, apps in the bar) the list would show more than the library and the gear.
+        ListMode.Header header = ListMode.applyHeader(listMode, new ListMode.Header(showInputsPill, showNetworkPill,
+                topMenu, launcherSettingsButton, reorderButton, vpnPill, iconOnlyButtons, libraryButton,
+                showLibraryPill, topBarApps));
+        showInputsPill = header.showInputsPill;
+        showNetworkPill = header.showNetworkPill;
+        topMenu = header.topMenu;
+        launcherSettingsButton = header.launcherSettingsButton;
+        reorderButton = header.reorderButton;
+        vpnPill = header.vpnPill;
+        iconOnlyButtons = header.iconOnlyButtons;
+        libraryButton = header.libraryButton;
+        showLibraryPill = header.showLibraryPill;
+        topBarApps = header.topBarApps;
         // A top-bar app is moved there, not copied: it leaves the grid.
         for (String pkg : topBarApps) if (!hidden.contains(pkg)) hidden.add(pkg);
         // A theme push or reset invalidates choices made on the TV. On first use, remember the
@@ -704,14 +736,42 @@ final class Config {
         // An on-TV wallpaper pick overrides the theme: a filename from the wallpapers/
         // collection, or "none". Unset means the theme decides (off by default).
         String wallpaperChoice = choices.getString(WALLPAPER_CHOICE_KEY, null);
-        List<File> chosen = WallpaperRotation.chosen(dir == null ? Collections.emptyList()
-                : WallpaperRotation.images(new File(dir, "wallpapers")), wallpaper, wallpaperChoice);
+        List<File> collection = dir == null ? Collections.emptyList()
+                : WallpaperRotation.images(new File(dir, "wallpapers"));
+        List<File> chosen = WallpaperRotation.chosen(collection, wallpaper, wallpaperChoice);
         if (chosen != null) {
             wallpapers.clear();
             wallpapers.addAll(chosen);
             wallpaper = chosen.isEmpty() ? null : chosen.get(0);
             wallpaperEnabled = !chosen.isEmpty();
         }
+        // list_mode's random play goes before the pick above: every picture of the collection, one change every
+        // RANDOM_MINUTES, in the order of a shuffle (never the same picture twice in a row). The theme's
+        // wallpaper_rotation_minutes is read from config.json only, so it is set here, not asked of the theme.
+        if (WallpaperRotation.randomPlay(listMode, choices.getBoolean(WALLPAPER_RANDOM_KEY, false), collection.size())) {
+            wallpapers.clear();
+            wallpapers.addAll(collection);
+            wallpaper = collection.get(0);
+            wallpaperEnabled = true;
+            rotationMinutes = WallpaperRotation.RANDOM_MINUTES;
+            wallpaperOrder = WallpaperRotation.ORDER_SHUFFLE;
+        }
+        // list_mode forces its layout values here, after the Launcher settings choices above (they may have stored a
+        // column count of 4 to 7): the list stays one column whatever was chosen. Off, every value passes unchanged.
+        ListMode.Layout forced = ListMode.apply(listMode, new ListMode.Layout(columns, rowsBelow, dockRow, dockTitle,
+                singleRow, ambientGlow, appGlow, cinematic, uniformTiles, fadeRows, alwaysShowNames, advancedEffects, animations));
+        columns = forced.columns;
+        rowsBelow = forced.rowsBelowDock;
+        dockRow = forced.dockRow;
+        dockTitle = forced.dockTitle;
+        singleRow = forced.singleRow;
+        ambientGlow = forced.ambientGlow;
+        appGlow = forced.appGlow;
+        cinematic = forced.cinematic;
+        uniformTiles = forced.uniformTiles;
+        fadeRows = forced.fadeRows;
+        alwaysShowNames = forced.alwaysShowNames;
+        advancedEffects = forced.advancedEffects;
         // A festive skin comes only from a theme; config.xml has no festival. seasonal_skin names one the same way
         // but launchers before it ignore the key, so a theme can carry it without older ones showing the diya skin.
         Festival festival = json == null ? Festival.NONE : Festival.parse(festivalName(json),
@@ -732,7 +792,7 @@ final class Config {
                 Math.max(0, Math.min(90, clockWallpaperDim)), clockGlow, glassStyle, singleRow && dockRow, dockBandAll, lunar, lunarOffset,
                 dateBelowClock, vpnPill, locale, powerOnHomeAlways, inputsConnectedOnly, inputsCecStateOnly,
                 Math.max(0, Math.min(600, openOnStartNetworkWait)), openOnStartOnWake, iconOnlyVpn, clockFormat, backOpensClock, glowSnap,
-                settingsKeyClearTask);
+                settingsKeyClearTask, listMode, circleList);
     }
 
     /**
@@ -765,7 +825,23 @@ final class Config {
         return races;
     }
 
-    private static void syncThemeChoices(SharedPreferences choices, File dir, File config) {
+    /** The choices made on the TV that a new theme (or "Theme default" in Launcher settings) takes back. */
+    static SharedPreferences.Editor removeThemeChoices(SharedPreferences.Editor editor) {
+        return editor.remove("columns").remove("animations").remove("advanced_effects")
+                .remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY).remove(WALLPAPER_RANDOM_KEY)
+                .remove(DOCK_OPACITY_KEY).remove(CLOCK_FORMAT_KEY);
+    }
+
+    /** True while any choice made on the TV is stored (Launcher settings then offers "Theme default"). */
+    static boolean hasOnTvChoices(SharedPreferences choices) {
+        return choices.contains("columns") || choices.contains(ROWS_BELOW_DOCK_KEY)
+                || choices.contains("animations") || choices.contains("advanced_effects")
+                || choices.contains(WALLPAPER_CHOICE_KEY) || choices.contains(WALLPAPER_RANDOM_KEY)
+                || choices.contains(DOCK_OPACITY_KEY) || choices.contains(CLOCK_FORMAT_KEY)
+                || choices.contains(OpenOnStart.KEY);
+    }
+
+    static void syncThemeChoices(SharedPreferences choices, File dir, File config) {
         File revision = dir == null ? null : new File(dir, THEME_REVISION_NAME);
         String token = revisionToken(revision);
         String signature = fileStamp(config) + ":" + token;
@@ -774,14 +850,10 @@ final class Config {
             // Existing preferences survive an app upgrade, unless the first launch follows an
             // explicit theme push or reset by the updated tools.
             SharedPreferences.Editor editor = choices.edit();
-            if (!"absent".equals(token)) editor.remove("columns").remove("animations")
-                    .remove("advanced_effects").remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY)
-                    .remove(DOCK_OPACITY_KEY).remove(CLOCK_FORMAT_KEY);
+            if (!"absent".equals(token)) removeThemeChoices(editor);
             editor.putString(THEME_SIGNATURE_KEY, signature).commit();
         } else if (!seen.equals(signature)) {
-            choices.edit().remove("columns").remove("animations").remove("advanced_effects")
-                    .remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY).remove(DOCK_OPACITY_KEY)
-                    .remove(CLOCK_FORMAT_KEY).putString(THEME_SIGNATURE_KEY, signature).commit();
+            removeThemeChoices(choices.edit()).putString(THEME_SIGNATURE_KEY, signature).commit();
         }
     }
 

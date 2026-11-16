@@ -35,6 +35,7 @@ public final class LauncherSettingsActivity extends Activity {
     private static final String[] CLOCK_FORMATS = {"system", "12", "24"};
     private final TextView[] clockChoices = new TextView[CLOCK_FORMATS.length];
     private TextView wallpaperChoice;
+    private TextView dimChoice;
     private TextView animationsChoice;
     private TextView advancedChoice;
     private TextView followThemeChoice;
@@ -45,6 +46,9 @@ public final class LauncherSettingsActivity extends Activity {
     private String clockFormat;
     private boolean animations;
     private boolean advancedEffects;
+    /** list_mode: the Wallpaper choice opens tiles (WallpaperTiles) instead of the list dialog. */
+    private boolean listMode;
+    private WallpaperTiles tiles;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -52,6 +56,10 @@ public final class LauncherSettingsActivity extends Activity {
         setContentView(R.layout.activity_launcher_settings);
         choices = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
         Config config = Config.load(this);
+        listMode = config.listMode;
+        // list_mode (straight or circle list) forces one column, no dock and no advanced effects: the rows that set them
+        // change nothing there.
+        hideRowsWithoutEffect(config.listMode);
         View reorderChoice = findViewById(R.id.reorderChoice);
         reorderChoice.setVisibility(config.launcherSettingsButton ? View.VISIBLE : View.GONE);
         reorderChoice.setOnClickListener(v -> {
@@ -125,6 +133,8 @@ public final class LauncherSettingsActivity extends Activity {
         }
         wallpaperChoice = findViewById(R.id.wallpaperChoice);
         wallpaperChoice.setOnClickListener(v -> showWallpaperPicker());
+        dimChoice = findViewById(R.id.dimChoice);
+        dimChoice.setOnClickListener(v -> startActivity(new Intent(this, DimSettingsActivity.class)));
         animationsChoice = findViewById(R.id.animationsChoice);
         animationsChoice.setOnClickListener(v -> {
             animations = !animations;
@@ -155,9 +165,7 @@ public final class LauncherSettingsActivity extends Activity {
         followThemeChoice = findViewById(R.id.followThemeChoice);
         followThemeChoice.setOnClickListener(v -> {
             if (!hasOnTvChoices()) return;
-            choices.edit().remove("columns").remove(Config.ROWS_BELOW_DOCK_KEY).remove("animations")
-                    .remove("advanced_effects").remove(Config.WALLPAPER_CHOICE_KEY)
-                    .remove(Config.DOCK_OPACITY_KEY).remove(Config.CLOCK_FORMAT_KEY).remove(OpenOnStart.KEY).commit();
+            Config.removeThemeChoices(choices.edit()).remove(OpenOnStart.KEY).commit();
             Config current = Config.load(this);
             columns = current.columns;
             rowsBelowDock = current.rowsBelowDock;
@@ -174,22 +182,93 @@ public final class LauncherSettingsActivity extends Activity {
                 open(SystemSettings.intent(this, Settings.ACTION_SETTINGS)));
         refresh();
         if (config.launcherSettingsButton) reorderChoice.requestFocus();
+        else if (!SettingsMenu.maskShows(SettingsMenu.COLUMNS, config.listMode)) wallpaperChoice.requestFocus();
         else columnChoices[Math.max(0, Math.min(columns - 4, 3))].requestFocus();
+    }
+
+    /** Rows that SettingsMenu says are not shown (list_mode): the labels and the choices go; the clock's heading keeps the gap the first group has. */
+    private void hideRowsWithoutEffect(boolean listMode) {
+        int[][] rows = {
+                {SettingsMenu.COLUMNS, R.id.columnsLabel, R.id.columnsRow},
+                {SettingsMenu.ROWS_BELOW_DOCK, R.id.rowsLabel, R.id.rowsRow},
+                {SettingsMenu.DOCK_OPACITY, R.id.dockLabel, R.id.dockRow},
+                {SettingsMenu.ADVANCED_EFFECTS, R.id.advancedChoice, R.id.advancedHint}};
+        for (int[] row : rows) {
+            int visibility = SettingsMenu.maskShows(row[0], listMode) ? View.VISIBLE : View.GONE;
+            findViewById(row[1]).setVisibility(visibility);
+            findViewById(row[2]).setVisibility(visibility);
+        }
+        if (!SettingsMenu.maskShows(SettingsMenu.COLUMNS, listMode)) {
+            // Groups sit 24 dp apart, and the first one 24 dp below the title (activity_launcher_settings.xml): the clock's heading is the first now.
+            android.view.ViewGroup.MarginLayoutParams lp =
+                    (android.view.ViewGroup.MarginLayoutParams) findViewById(R.id.clockLabel).getLayoutParams();
+            lp.topMargin = Math.round(24 * getResources().getDisplayMetrics().density);
+            findViewById(R.id.clockLabel).setLayoutParams(lp);
+        }
+    }
+
+    /** Back from the Dim screen submenu: show its switch and value as stored (the row never keeps its own copy). */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        SharedPreferences dim = DimStore.prefs(this);
+        dimChoice.setText(getString(R.string.dim_state,
+                DimStore.isOn(dim, OpenOnStart.boot(this), DimStore.runNow())
+                        ? getString(R.string.dim_percent, DimStore.value(dim)) : getString(R.string.off)));
+    }
+
+    /** The Home key leaves this screen with the wallpaper window open: close it, so its loader thread ends too. */
+    @Override
+    protected void onStop() {
+        if (tiles != null) tiles.dismiss();
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (tiles != null) tiles.dismiss();
+        super.onDestroy();
     }
 
     private void reverseRow(TextView[] views) {
         LinearLayout row = (LinearLayout) views[0].getParent();
         row.removeAllViews();
         for (int i = views.length - 1; i >= 0; i--) row.addView(views[i]);
+        // The last column of a row has no end margin (its right edge is flush with a full row); the order changed, so move it.
+        for (int i = 0; i < row.getChildCount(); i++) {
+            android.view.ViewGroup.MarginLayoutParams lp = (android.view.ViewGroup.MarginLayoutParams) row.getChildAt(i).getLayoutParams();
+            lp.setMarginEnd(i == row.getChildCount() - 1 ? 0 : Math.round(10 * getResources().getDisplayMetrics().density));
+            row.getChildAt(i).setLayoutParams(lp);
+        }
     }
 
     private void showWallpaperPicker() {
         File dir = Config.dir(this);
         List<File> images = new java.util.ArrayList<>(WallpaperRotation.images(
                 dir == null ? null : new File(dir, "wallpapers")));
-        // A theme with a single wallpaper.jpg offers that picture too (Config maps the choice back to it).
+        // A theme with a single wallpaper.jpg offers that picture too (Config maps the choice back to it). The tiles of
+        // list_mode do not: wallpaper.jpg is a copy of one of the pictures, the one Home shows without a choice.
         File single = dir == null ? null : new File(dir, Config.WALLPAPER_NAME);
-        if (single != null && single.isFile()) images.add(0, single);
+        if (!listMode && single != null && single.isFile()) images.add(0, single);
+        if (listMode) {
+            // Tiles, one per picture, and the tick "Random abspielen"; no "None" and no "Theme default".
+            tiles = WallpaperTiles.show(this, images, choices.getString(Config.WALLPAPER_CHOICE_KEY, null),
+                    choices.getBoolean(Config.WALLPAPER_RANDOM_KEY, false), on -> {
+                        // Present only while on: an off tick leaves no key behind (hasOnTvChoices counts keys).
+                        if (on) choices.edit().putBoolean(Config.WALLPAPER_RANDOM_KEY, true).apply();
+                        else choices.edit().remove(Config.WALLPAPER_RANDOM_KEY).apply();
+                        changed();
+                        refresh();
+                    }, name -> {
+                        // A picture picked from the tiles ends the random play.
+                        choices.edit().putString(Config.WALLPAPER_CHOICE_KEY, name)
+                                .remove(Config.WALLPAPER_RANDOM_KEY).apply();
+                        changed();
+                        Toast.makeText(this, R.string.wallpaper_applied, Toast.LENGTH_SHORT).show();
+                        refresh();
+                    });
+            return;
+        }
         String[] labels = new String[images.size() + 1];
         for (int i = 0; i < images.size(); i++) labels[i] = images.get(i).getName();
         labels[images.size()] = getString(R.string.wallpaper_none);
@@ -313,18 +392,15 @@ public final class LauncherSettingsActivity extends Activity {
         advancedChoice.setAlpha(animations ? 1f : 0.5f);
         String wallpaperCurrent = choices.getString(Config.WALLPAPER_CHOICE_KEY, null);
         wallpaperChoice.setText(getString(R.string.wallpaper_state,
-                "none".equals(wallpaperCurrent) ? getString(R.string.wallpaper_none)
+                listMode && choices.getBoolean(Config.WALLPAPER_RANDOM_KEY, false) ? getString(R.string.wallpaper_random)
+                        : "none".equals(wallpaperCurrent) ? getString(R.string.wallpaper_none)
                         : wallpaperCurrent != null ? wallpaperCurrent
                         : getString(R.string.wallpaper_theme_default)));
         openOnStartChoice.setText(getString(R.string.open_on_start_state, openOnStartLabel()));
-        followThemeChoice.setSelected(!hasOnTvChoices());
     }
 
     private boolean hasOnTvChoices() {
-        return choices.contains("columns") || choices.contains(Config.ROWS_BELOW_DOCK_KEY)
-                || choices.contains("animations") || choices.contains("advanced_effects")
-                || choices.contains(Config.WALLPAPER_CHOICE_KEY) || choices.contains(Config.DOCK_OPACITY_KEY)
-                || choices.contains(Config.CLOCK_FORMAT_KEY) || choices.contains(OpenOnStart.KEY);
+        return Config.hasOnTvChoices(choices);
     }
 
     private void open(Intent intent) {

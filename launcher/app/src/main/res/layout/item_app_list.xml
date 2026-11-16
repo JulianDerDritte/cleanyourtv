@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- list_mode: one row, a white symbol and, only while the row has focus, the app's name. The ids are item_app.xml's,
+     because AppAdapter.Holder looks for them; the banner and the name under a tile do not exist in a row and stay
+     gone. Sizes are set from ListMode. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <FrameLayout
+        android:id="@+id/card"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:clipChildren="false"
+        android:focusable="true"
+        android:clickable="true">
+
+        <ImageView
+            android:id="@+id/banner"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
+            android:contentDescription="@null" />
+
+        <!-- The symbol field: drawn at its own size, centred, never scaled. -->
+        <ImageView
+            android:id="@+id/icon"
+            android:layout_width="48dp"
+            android:layout_height="36dp"
+            android:layout_gravity="start|center_vertical"
+            android:scaleType="center"
+            android:contentDescription="@null" />
+
+        <!-- Shown by AppAdapter only for the focused row (or always for an app without a symbol). -->
+        <TextView
+            android:id="@+id/label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:gravity="start|center_vertical"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF"
+            android:textSize="22sp"
+            android:visibility="gone"
+            android:fontFamily="@string/font_medium" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/name"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+</FrameLayout>

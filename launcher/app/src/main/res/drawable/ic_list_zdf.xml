@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- list_mode symbol: ZDF, white.
+     Package: com.zdf.android.mediathek
+     Source: Simple Icons 16.36.0, icons/zdf.svg
+     License: CC0 1.0 (Simple Icons)
+     Size is the size it is drawn at, so the ImageView centres it and does not scale it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="28.053dp"
+    android:viewportWidth="24"
+    android:viewportHeight="14.026">
+    <group
+        android:translateX="0"
+        android:translateY="-4.987">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M7.014 4.987 A7.02 7.02 0 0 0 0 12.005 a7.017 7.017 0 0 0 13.271 3.174 h2.915 c0.696 0 1.324 -0.044 1.962 -0.553 0.461 -0.365 0.749 -0.884 0.883 -1.56 v2.103 h1.336 v-2.473 h3.153 v-1.1 h-3.16 l0.02 -0.445 c0.005 -0.724 0.226 -1.162 1.277 -1.162 H24 V8.876 h-2.818 c-1.517 0 -2.141 0.85 -2.141 2.18 v0.129 c-0.254 -1.565 -1.185 -2.31 -2.889 -2.31 h-2.855 a7.018 7.018 0 0 0 -6.283 -3.888 z M8.02 8.876 h3.436 c1.742 0 1.992 1.219 1.992 1.9 0 0.725 -0.298 1.873 -1.992 1.873 h-0.844 c-1.056 0 -1.281 0.38 -1.281 1.104 v0.336 h3.945 v1.074 H7.982 v-1.558 c0 -1.335 0.625 -2.123 2.137 -2.123 h0.873 c0.691 0 1.1 -0.14 1.1 -0.725 0 -0.605 -0.409 -0.772 -1.12 -0.772 h-2.95 v-1.11 z M14.65 9.989 h1.472 c1.157 0 1.574 0.496 1.574 2.04 0 1.542 -0.412 2.036 -1.574 2.036 H14.65 z" />
+    </group>
+</vector>

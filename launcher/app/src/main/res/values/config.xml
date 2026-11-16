@@ -458,6 +458,24 @@
     <string-array name="library_excluded_apps" translatable="false">
     </string-array>
 
+    <!-- Home as one vertical list of white app symbols on the left (the dock apps first, then the other apps) instead of
+         tiles; the name of the focused symbol shows behind it, and an app without a symbol shows its name always. The
+         wallpaper is not darkened; the clock, the date, the symbols and the names carry a soft black shadow instead. Forces one
+         column, no dock band, no glow and no tile zoom, whatever columns, dock_row and the Launcher settings say, and
+         a top bar of two round buttons, the library and the gear: Inputs and the network name move into the menu
+         behind holding OK on the gear, the app library row after the list goes. In Launcher settings the Wallpaper
+         choice shows the pictures as tiles. Off by default, so existing setups change nothing; a theme can set
+         "list_mode": true. -->
+    <bool name="list_mode">false</bool>
+
+    <!-- circle_list: with list_mode, the list of apps as part of a circle instead of a straight column: the circle
+         centre is left of the screen, the symbols sit on an arc, the chosen one is on the right of it a little below
+         the screen's middle with its name, the one before and the one after sit above and below it, further left.
+         Up and Down turn the arc by one place and never reach an end; Right goes to the top buttons, Down or Left
+         (on the first button) back to the chosen app. Without list_mode it changes nothing. Off by default; a theme
+         can set "circle_list": true. -->
+    <bool name="circle_list">false</bool>
+
     <!-- Module cards: an app that declares a card (docs/specs/card.md) can stand in for its tile with its own
          label, caption and glow colour, once you answer Show on the prompt. false: never look for cards or ask. -->
     <bool name="module_cards">true</bool>

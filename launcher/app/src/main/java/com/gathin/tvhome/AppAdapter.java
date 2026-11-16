@@ -218,6 +218,10 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Map<String, String> appLabels, appBanners;
     /** Every app tile is its icon on a card tinted from that icon, never its banner (config.xml, uniform_tiles). */
     private final boolean uniformTiles;
+    /** list_mode: one row of icon and name per app instead of a tile (config.xml, list_mode). */
+    private final boolean listMode;
+    /** circle_list: the rows of list_mode sit on an arc (CircleLayoutManager); their names fade with the turn, not with focus. */
+    private final boolean circle;
     /** Packages drawn from their icon and name even when they have a banner (config.xml icon_tiles). */
     private final Set<String> iconTiles;
     private final List<Entry> items = new ArrayList<>();
@@ -248,6 +252,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         this.appLabels = cfg.appLabels;
         this.appBanners = cfg.appBanners;
         this.uniformTiles = cfg.uniformTiles;
+        this.listMode = cfg.listMode;
+        this.circle = cfg.circleList;
         // Tiles keep their identity across reload(), so a focused tile stays on its app instead of
         // its view being rebound to whatever app now sits in that slot.
         setHasStableIds(true);
@@ -298,7 +304,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             if (!seen.add(pkg + '\n' + label)) continue;
             Drawable banner = null;
             // uniform_tiles draws the icon, so an app's banner is never loaded. A module card keeps its banner.
-            if (!(uniformTiles && card == null)) {
+            if (!listMode && !(uniformTiles && card == null)) {
                 banner = bundledBanner(appBanners.get(pkg));
                 if (banner == null) banner = iconTiles.contains(pkg) ? iconBanner(ri.loadIcon(pm)) : loadBanner(pm, ri);
             }
@@ -411,8 +417,24 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             });
             return new RecyclerView.ViewHolder(row) { };
         }
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_app, parent, false);
         float density = parent.getResources().getDisplayMetrics().density;
+        if (listMode) {
+            // A list row: sizes from ListMode, no tile maths (columns is 1 and there is no dock).
+            View row = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_app_list, parent, false);
+            row.setPadding(row.getPaddingLeft(), Math.round(ListMode.ROW_PAD_DP * density), row.getPaddingRight(),
+                    Math.round(ListMode.ROW_PAD_DP * density));
+            row.findViewById(R.id.card).getLayoutParams().height = Math.round(ListMode.CARD_DP * density);
+            ViewGroup.LayoutParams iconParams = row.findViewById(R.id.icon).getLayoutParams();
+            iconParams.width = Math.round(ListMode.ICON_W_DP * density);
+            iconParams.height = Math.round(ListMode.ICON_H_DP * density);
+            ((TextView) row.findViewById(R.id.label)).setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, ListMode.NAME_SP);
+            ((TextView) row.findViewById(R.id.label)).setShadowLayer(ListMode.SHADOW_RADIUS_PX * density / 2f, 0f,
+                    ListMode.SHADOW_DY_PX * density / 2f, ListMode.SHADOW_COLOR);
+            Holder listHolder = new Holder(row, listener, animations, advancedEffects, reducedMotion, restNameAlpha, focusOvershoot, true);
+            listHolder.circle = circle;
+            return listHolder;
+        }
+        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_app, parent, false);
         int width = parent.getWidth() > 0 ? parent.getWidth() : parent.getMeasuredWidth();
         int inner = width - parent.getPaddingLeft() - parent.getPaddingRight();
         int w = tileWidthPx(inner, parent.getHeight(), dockSize, rowsBelowDock, dockTitle, dockRow, density), h = tileHeightPx(w);
@@ -452,7 +474,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             View label = v.findViewById(R.id.label);
             label.setPadding(label.getPaddingLeft(), label.getPaddingTop(), label.getPaddingRight(), Math.round(4f * density));
         }
-        return new Holder(v, listener, animations, advancedEffects, reducedMotion, restNameAlpha, focusOvershoot);
+        return new Holder(v, listener, animations, advancedEffects, reducedMotion, restNameAlpha, focusOvershoot, false);
     }
 
     @Override
@@ -468,8 +490,41 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             h.name.setVisibility(View.INVISIBLE);
             h.banner.setImageDrawable(null);
             h.icon.setImageDrawable(null);
+            h.hasSymbol = false;
             h.card.setOnClickListener(null);
             h.card.setOnLongClickListener(null);
+            return;
+        }
+        if (listMode) {
+            // A white symbol, and the name only while the row has focus (always, for an app without a symbol). The row
+            // has no banner, no tile fill and no name under it; the card carries the name for TalkBack.
+            h.card.setVisibility(View.VISIBLE);
+            h.card.setFocusable(true);
+            h.card.setBackground(null);
+            h.inDock = false;
+            String pkg = e.pkg != null ? e.pkg : e.component != null ? e.component.getPackageName() : null;
+            int symbol = ListMode.symbolFor(pkg);
+            // Every row has a symbol: the app's logo, or a monogram of its name (ListMode.listRowHasSymbol).
+            h.hasSymbol = ListMode.listRowHasSymbol(symbol);
+            h.card.setContentDescription(e.name);
+            h.icon.setImageDrawable(symbol != 0 ? listSymbol(symbol)
+                    : monogramSymbol(ListMode.monogramLetter(e.name, pkg)));
+            h.icon.setVisibility(View.VISIBLE);
+            h.label.setText(e.name);
+            ViewGroup.MarginLayoutParams labelParams = (ViewGroup.MarginLayoutParams) h.label.getLayoutParams();
+            float listDensity = h.card.getResources().getDisplayMetrics().density;
+            labelParams.setMarginStart(h.hasSymbol ? Math.round(ListMode.NAME_START_DP * listDensity) : 0);
+            h.label.setLayoutParams(labelParams);
+            // A name ends at x = 640 px at the latest; a longer one is cut with an ellipsis (singleLine, ellipsize end).
+            if (circle) {
+                // The name is always laid out; CircleLayoutManager sets its alpha from the row's place on the arc.
+                h.label.setMaxWidth(Math.round(CircleList.NAME_MAX_DP * listDensity));
+                h.label.setVisibility(View.VISIBLE);
+            } else {
+                h.label.setMaxWidth(Math.round(ListMode.nameMaxWidthDp(h.hasSymbol) * listDensity));
+                h.label.setVisibility(ListMode.nameVisible(h.hasSymbol, h.card.isFocused()) ? View.VISIBLE : View.GONE);
+            }
+            bindActions(h, e);
             return;
         }
         h.card.setVisibility(View.VISIBLE);
@@ -509,6 +564,53 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             h.label.setText(e.label);
             h.label.setVisibility(uniformTiles ? View.GONE : View.VISIBLE);
         }
+        bindActions(h, e);
+    }
+
+    /** list_mode: each white symbol with its soft shadow, made once from the symbol's own shape and shared by the rows. */
+    private final Map<Integer, Drawable.ConstantState> listSymbols = new HashMap<>();
+
+    private Drawable listSymbol(int resId) {
+        Drawable.ConstantState made = listSymbols.get(resId);
+        if (made == null) {
+            Drawable symbol = ctx.getDrawable(resId).mutate();
+            made = ShadowIcons.make(symbol, symbol, symbol.getIntrinsicWidth(), symbol.getIntrinsicHeight(),
+                    ctx.getResources().getDisplayMetrics().density / 2f).getConstantState();
+            listSymbols.put(resId, made);
+        }
+        return made.newDrawable();
+    }
+
+    /** list_mode: a monogram with its shadow, made once per letter (one shadow bitmap each, ListMode.shadowBitmapBytes). */
+    private final Map<String, Drawable.ConstantState> monogramSymbols = new HashMap<>();
+
+    private Drawable monogramSymbol(String letter) {
+        Drawable.ConstantState made = monogramSymbols.get(letter);
+        if (made == null) {
+            float density = ctx.getResources().getDisplayMetrics().density;
+            Drawable symbol = new MonogramDrawable(letter, density);
+            made = ShadowIcons.make(symbol, symbol, symbol.getIntrinsicWidth(), symbol.getIntrinsicHeight(),
+                    density / 2f).getConstantState();
+            monogramSymbols.put(letter, made);
+        }
+        return made.newDrawable();
+    }
+
+    /**
+     * The packages of the rows in the order Home shows them (apps and cards; the empty dock slots and the Default-home
+     * tile carry the launcher's own package and are left out), each package once. The app library sorts the chosen by it.
+     */
+    List<String> packagesInOrder() {
+        List<String> packages = new ArrayList<>();
+        for (Entry entry : items) {
+            if (entry.kind != Entry.APP && entry.kind != Entry.CARD) continue;
+            if (entry.pkg != null) packages.add(entry.pkg);
+        }
+        return LibraryOrder.distinct(packages);
+    }
+
+    /** OK opens the app; holding OK opens its tile menu (tile_menu) or its App info page. */
+    private void bindActions(Holder h, Entry e) {
         h.card.setOnClickListener(v -> launch(e));
         h.card.setOnLongClickListener(v -> {
             if (tileMenu) {
@@ -677,7 +779,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     float focusScale() {
-        return !animations ? 1f : advancedEffects ? 1.12f : 1.10f;
+        return !animations || listMode ? 1f : advancedEffects ? 1.12f : 1.10f;
     }
 
     /** A vivid colour sampled from the app's banner (or icon), cached per entry; a card's accent when it set one. */
@@ -916,9 +1018,15 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         final boolean overshoot;
         /** A dock tile: it grows in place without advanced_effects' lift, which reads as off-centre in the band (#2135). */
         boolean inDock;
+        /** list_mode row: the focus highlight does not zoom the row. */
+        final boolean list;
+        /** list_mode row: the app has a white symbol, so its name shows only while the row has focus. */
+        boolean hasSymbol;
+        /** circle_list row: the name's visibility is the layout manager's, not focus's. */
+        boolean circle;
 
         Holder(View v, TileListener listener, boolean animations, boolean advancedEffects,
-               boolean reducedMotion, float restNameAlpha, boolean overshoot) {
+               boolean reducedMotion, float restNameAlpha, boolean overshoot, boolean list) {
             super(v);
             card = v.findViewById(R.id.card);
             cardBackground = card.getBackground();
@@ -931,6 +1039,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             this.reducedMotion = reducedMotion;
             this.restNameAlpha = restNameAlpha;
             this.overshoot = overshoot;
+            this.list = list;
 
             final float density = v.getResources().getDisplayMetrics().density;
             card.setOutlineProvider(new ViewOutlineProvider() {
@@ -951,10 +1060,19 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             });
 
             card.setOnFocusChangeListener((view, focused) -> {
+                if (list) {
+                    // The focus shows in the name alone: no zoom, no glass, no animation.
+                    if (!circle) label.setVisibility(ListMode.nameVisible(hasSymbol, focused) ? View.VISIBLE : View.GONE);
+                    int listPos = getBindingAdapterPosition();
+                    if (focused && listener != null && listPos != RecyclerView.NO_POSITION) {
+                        listener.onTileFocused(listPos, view);
+                    }
+                    return;
+                }
                 view.animate().cancel();
                 banner.animate().cancel();
                 name.animate().cancel();
-                float scale = !animations ? 1f : advancedEffects ? 1.12f : 1.10f;
+                float scale = !animations || list ? 1f : advancedEffects ? 1.12f : 1.10f;
                 float s = focused ? scale : 1f;
                 if (!animations) {
                     view.setScaleX(1f);

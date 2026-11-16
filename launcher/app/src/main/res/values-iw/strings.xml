@@ -110,6 +110,9 @@
     <string name="library_recent">חדשה · הוספה למסך הבית</string>
     <string name="library_hint_add">לחיצה להוספה למסך הבית · לחיצה ממושכת לאפשרויות</string>
     <string name="library_hint_open">לחיצה לפתיחה · לחיצה ממושכת לאפשרויות</string>
+    <string name="library_move">הזזה</string>
+    <string name="circle_move_hint">למעלה / למטה: הזזת האפליקציה · אישור: שמירה · חזרה: ביטול</string>
+    <string name="library_move_hint">שמאלה / ימינה: הזזה · אישור: להניח כאן · חזרה: ביטול</string>
     <plurals name="library_app_count">
         <item quantity="one">אפליקציה אחת</item>
         <item quantity="two">שתי אפליקציות</item>
@@ -121,6 +124,7 @@
     <string name="wallpaper_state">טפט: %1$s</string>
     <string name="wallpaper_none">ללא</string>
     <string name="wallpaper_applied">הטפט שונה</string>
+    <string name="wallpaper_random">ניגון אקראי</string>
     <string name="wallpaper_theme_default">ברירת המחדל של ערכת הנושא</string>
 
     <!-- Race-weekend panel (RaceWeekend). -->
@@ -152,4 +156,15 @@
     <string name="clock_format_system">מערכת</string>
     <string name="clock_format_12">12 שעות</string>
     <string name="clock_format_24">24 שעות</string>
+    <string name="dim_label">עמעום מסך</string>
+    <string name="dim_state">עמעום מסך: %1$s</string>
+    <string name="dim_switch_state">עמעום מסך: %1$s</string>
+    <string name="dim_value_state">ערך: %1$d %%</string>
+    <string name="dim_percent">%1$d %%</string>
+    <string name="dim_permission_missing">חסרה הרשאה: הצגה מעל אפליקציות אחרות אינה מותרת לאפליקציה זו.</string>
+    <string name="dim_error_boot">הניסיון האחרון נכשל: הטלוויזיה אינה מדווחת על מספר ההפעלות.</string>
+    <string name="dim_error_service">הניסיון האחרון נכשל: לא ניתן היה להפעיל את שכבת העמעום. ראו את היומן.</string>
+    <string name="dim_layer_active">השכבה פעילה.</string>
+    <string name="dim_keep">שמירת ההגדרות</string>
+    <string name="dim_hint">חשוך מדי? לחצו כאן על שמאלה עד שהערך קטן. בלי הסימון ב\"שמירת ההגדרות\" אפשר גם לכבות ולהדליק את הטלוויזיה או לנתק אותה מהחשמל: המתג חוזר לכבוי אחרי המתנה ואתחול, והערך נשאר. עם הסימון השכבה נשארת פעילה אחרי המתנה וחוזרת אחרי אתחול. שמאלה וימינה משנים את הערך באחוז אחד, עד 95; החזיקו את הלחצן כדי לרוץ.</string>
 </resources>

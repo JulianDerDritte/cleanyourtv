@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The box of a tick row, empty or filled with a check mark; dark while the row has focus (its fill is white then). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:state_focused="true" android:drawable="@drawable/random_box_on_focused" />
+    <item android:state_focused="true" android:drawable="@drawable/random_box_off_focused" />
+    <item android:state_checked="true" android:drawable="@drawable/random_box_on" />
+    <item android:drawable="@drawable/random_box_off" />
+</selector>

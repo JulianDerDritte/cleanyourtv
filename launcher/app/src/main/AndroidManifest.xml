@@ -21,6 +21,15 @@
     <!-- YaOS (Yandex TV OS): HDMI, AV and the tuner all play in com.yandex.tv.live, whose activities require
          this permission (protection level normal, so it is granted at install). Ignored on other TVs. -->
     <uses-permission android:name="yandex.tv.permission.ACCESS_TV_SOURCE" />
+    <!-- Dim screen (DimService): the dimming layer is a window over every app, which the Settings screen
+         "Display over other apps" allows; the TV's owner grants it over ADB (appops), never at runtime. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- The dimming layer is held by a foreground service (a normal permission, granted at install). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- targetSdk 34: a foreground service names its type, and the type needs its own permission (normal). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Brings the dimming layer back after a restart, only with "Keep settings" ticked (DimBootReceiver). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Android 11+ package visibility: lets the launcher list the TV apps it shows as tiles, and the
          apps that declare a module card (docs/specs/card.md). -->
@@ -111,6 +120,29 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:screenOrientation="landscape" />
+        <!-- Dim screen submenu, opened from Launcher settings only. -->
+        <activity
+            android:name=".DimSettingsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true" />
+        <!-- Holds the dimming layer; started by DimSettingsActivity only, never restarted by the system. -->
+        <service
+            android:name=".DimService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a user-chosen screen dimming layer over other apps" />
+        </service>
+        <!-- Starts the layer after a restart when "Keep settings" and the switch are on. The system sends the boot
+             broadcast itself, so the receiver is not exported; it reads nothing from the broadcast. -->
+        <receiver
+            android:name=".DimBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
         <!-- The system input switcher (com.android.tv.action.VIEW_INPUTS), which is what the remote's Input
              button becomes through the TV's Live TV app or InputKeyService. Disabled here and switched on by
              MainActivity only while handle_view_inputs is true (config.xml or a theme), for sets whose stock

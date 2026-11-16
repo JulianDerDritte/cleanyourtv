@@ -135,4 +135,43 @@ public class WallpaperRotationTest {
         for (int i = 0; i < out.length; i++) out[i] = files.get(i).getName();
         return Arrays.asList(out);
     }
+
+    // ---- list_mode's random play ----
+
+    @Test
+    public void randomPlayIsOnWithListModeTheTickAndPictures() {
+        assertTrue(WallpaperRotation.randomPlay(true, true, 17));
+    }
+
+    @Test
+    public void randomPlayIsOffWithoutListMode() {
+        assertFalse(WallpaperRotation.randomPlay(false, true, 17));
+    }
+
+    @Test
+    public void randomPlayIsOffWithTheTickOff() {
+        assertFalse(WallpaperRotation.randomPlay(true, false, 17));
+    }
+
+    @Test
+    public void randomPlayIsOffWithoutPictures() {
+        assertFalse(WallpaperRotation.randomPlay(true, true, 0));
+    }
+
+    @Test
+    public void randomPlayChangesEveryTenMinutes() {
+        assertEquals(10, WallpaperRotation.RANDOM_MINUTES);
+    }
+
+    @Test
+    public void randomChangeIsDueAfterNineMinutesFiftyEightSeconds() {
+        long interval = WallpaperRotation.RANDOM_MINUTES * 60_000L;
+        assertTrue(WallpaperRotation.due(1_000L, 1_000L + 598_000L, interval));
+    }
+
+    @Test
+    public void randomChangeIsNotDueOneMillisecondEarlier() {
+        long interval = WallpaperRotation.RANDOM_MINUTES * 60_000L;
+        assertFalse(WallpaperRotation.due(1_000L, 1_000L + 597_999L, interval));
+    }
 }

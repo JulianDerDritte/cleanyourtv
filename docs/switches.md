@@ -68,6 +68,8 @@ rule sit on its wanted list until a screenshot arrives.
 | `inputs_cec_state_only` | <img src="switches/inputs_cec_state_only.jpg" width="320" alt="inputs_cec_state_only: Steam Deck · HDMI 1 Connected, the bare HDMI 2 with no state, on a TV"> |
 | `icon_tiles` | <img src="switches/icon_tiles.jpg" width="320" alt="icon_tiles: an app drawn from its icon in the grid on a TV"> |
 | `game_day` | <img src="switches/game_day.jpg" width="320" alt="game_day: Minnesota Vikings at Detroit Lions, Kickoff in 5d 13h, with four dots, under the clock on a TV"> |
+| `list_mode` | <img src="switches/list_mode.jpg" width="320" alt="list_mode on a TV: Home as a list of white symbols, with the menu behind the gear"> |
+| `circle_list` | <img src="switches/circle_list.jpg" width="320" alt="circle_list on a TV: the apps on an arc, the chosen one with its name"> |
 | `clock_format` | <img src="switches/clock_format.jpg" width="320" alt="clock_format on a TV"> |
 | `glow_snap` | <img src="switches/glow_snap.jpg" width="320" alt="glow_snap on a TV: the glow in Netflix red behind the dock"> |
 | `settings_key_clear_task` | <img src="switches/settings_key_clear_task.jpg" width="320" alt="settings_key_clear_task on a TV: the TV Settings screen the gear opens"> |

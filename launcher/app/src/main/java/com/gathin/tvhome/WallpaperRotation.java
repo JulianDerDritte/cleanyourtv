@@ -90,4 +90,12 @@ final class WallpaperRotation {
         long slack = Math.min(2_000L, interval / 10);
         return interval > 0 && (previous == 0 || now < previous || now - previous >= interval - slack);
     }
+
+    /** list_mode's random play: minutes between two pictures. A constant, not a setting. */
+    static final int RANDOM_MINUTES = 10;
+
+    /** True when Home changes the picture at random through the whole collection: list_mode, the tick on, pictures there. */
+    static boolean randomPlay(boolean listMode, boolean random, int pictures) {
+        return listMode && random && pictures > 0;
+    }
 }

@@ -29,6 +29,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -111,6 +112,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** Tiles per row and dock slots (res/values/config.xml, columns). Set in onCreate. */
     static int COLUMNS = 4;
     private boolean rtlAppGrid;
+    /** Home as a vertical list of names (config.xml, list_mode); see {@link ListMode}. */
+    private boolean listMode;
+    /** The apps of list_mode on an arc (config.xml, circle_list; only with list_mode); see {@link CircleList}. */
+    private boolean circleList;
+    private CircleLayoutManager circleLayout;
     private static final long MINUTE_MS = 60_000L;
     private static final long STATS_MS = 10_000L;
     /**
@@ -248,6 +254,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     // Static so they survive the activity being destroyed while another app is open (low-memory TVs,
     // or Developer options → "Don't keep activities"); they only reset when the process dies.
     private static int lastFocused = 0;
+    /**
+     * list_mode: the id of the top button (gear or library) that had focus last, 0 when a row did. restoreFocus puts
+     * focus back there instead of on a row (Back from the TV settings lands on the gear). Static for the same reason
+     * as lastFocused: it must survive recreate().
+     */
+    private static int headerFocusId = 0;
     /** App of the last focused tile, so focus follows it when the app list changes. */
     private static String lastFocusedKey;
     private float density;
@@ -482,6 +494,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         reducedMotion = cfg.reducedMotion;
         dockRow = cfg.dockRow;
         singleRow = cfg.singleRow;
+        listMode = cfg.listMode;
+        circleList = cfg.circleList;
         focusOvershoot = cfg.focusOvershoot;
         festival = cfg.festival;
         festive = festival.active(LocalDate.now());
@@ -616,10 +630,37 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         libraryExcludedApps = new HashSet<>(cfg.libraryExcludedApps);
 
         grid = findViewById(R.id.grid);
+        // The list is a narrow column on the left; the wallpaper shows to its right. It is as tall as its rows (up to
+        // the room under the header) and sits at the bottom, so more rows grow it upwards and, past the room, scroll
+        // it. The space under the last row is ListMode.BOTTOM_PAD_DP; nothing above, nothing at the sides, so the
+        // symbol field starts at the clock's left edge.
+        if (listMode) {
+            FrameLayout.LayoutParams listParams = (FrameLayout.LayoutParams) grid.getLayoutParams();
+            listParams.width = Math.round(ListMode.GRID_WIDTH_DP * density);
+            listParams.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            listParams.gravity = Gravity.BOTTOM;
+            grid.setLayoutParams(listParams);
+            grid.setPadding(0, 0, 0, Math.round(ListMode.BOTTOM_PAD_DP * density));
+            if (circleList) {
+                // The arc is drawn over the whole screen under the header: the list is as big as its parent, and neither it
+                // nor the wrapper around it (activity_main.xml, no clipChildren there) cuts off the rows above and below.
+                listParams.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                listParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                listParams.gravity = Gravity.NO_GRAVITY;
+                grid.setLayoutParams(listParams);
+                grid.setPadding(0, 0, 0, 0);
+                grid.setClipChildren(false);
+                grid.setClipToPadding(false);
+                ((ViewGroup) grid.getParent()).setClipChildren(false);
+            }
+        }
         rtlAppGrid = getResources().getBoolean(R.bool.rtl_app_grid);
         // Mirror only the app grid; the header and other locales keep their own layouts.
         // single_row: one span laid out sideways, so the same adapter, glass and dock band serve a scrolling row.
-        grid.setLayoutManager(new GridLayoutManager(this, singleRow ? 1 : COLUMNS,
+        if (circleList) {
+            circleLayout = new CircleLayoutManager(density, CircleList.durationMs(animations, reducedMotion));
+            grid.setLayoutManager(circleLayout);
+        } else grid.setLayoutManager(new GridLayoutManager(this, singleRow ? 1 : COLUMNS,
                 singleRow ? RecyclerView.HORIZONTAL : RecyclerView.VERTICAL, false) {
             @Override
             protected boolean isLayoutRTL() {
@@ -671,10 +712,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 return true;
             }
         });
-        ((GridLayoutManager) grid.getLayoutManager()).setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
+        if (!circleList) ((GridLayoutManager) grid.getLayoutManager()).setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
             @Override public int getSpanSize(int position) { return !singleRow && adapter != null && adapter.isLibraryAt(position) ? COLUMNS : 1; }
         });
-        grid.setHasFixedSize(true);
+        // The list is as tall as its rows, so a change in their number must measure it again.
+        grid.setHasFixedSize(!listMode);
         grid.setItemAnimator(null);
         // Tiles that scroll out while reordering come back from the view cache without a rebind; set their
         // dimming again whenever one attaches, so alpha matches the current mode.
@@ -722,7 +764,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // room above the dock and the last rows run off the bottom instead of the title drawing over the clock.
             if (MainActivity.this.dockRow && cfg.dockTitle && rowsBelowDock > 0) want = Math.max(want, (int) (AppAdapter.TITLE_ROOM_DP * density));
             // No dock to push down: the grid starts at the top, with room for the first row's zoom and glass.
-            if (!MainActivity.this.dockRow) want = (int) (AppAdapter.TOP_ROOM_DP * density);
+            if (!MainActivity.this.dockRow) want = listMode ? 0 : (int) (AppAdapter.TOP_ROOM_DP * density);
             // A single row never shows the names under its tiles (the title above the row names the app), so the
             // 7dp gap and 22dp label item_app.xml keeps for them would only lift the row: sit it that much lower.
             if (singleRow && !cfg.alwaysShowNames) want += (int) (29 * density);
@@ -885,6 +927,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             else makeIconOnly(btnWifi);
             makeIconOnly((TextView) btnSettings);
         }
+        if (listMode) {
+            // Two round buttons, library and gear: 40 px between them (the other pills are gone and take no room).
+            ((ViewGroup.MarginLayoutParams) btnSettings.getLayoutParams())
+                    .setMarginStart(Math.round(ListMode.HEADER_GAP_DP * density));
+            applyListShadows();
+        }
         if (cfg.iconOnlyInputs) makeIconOnly((TextView) btnInputs);
         iconOnlyVpn = vpnPill && cfg.iconOnlyVpn;
         if (iconOnlyVpn) {
@@ -905,12 +953,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return true;
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 // Back to the dock tile Up came from, not wherever the focus finder lands.
-                focusTile(singleRow ? lastFocused : lastFocused % COLUMNS);
+                focusTile(circleList ? ListMode.afterHeaderDown(lastFocused, adapter.appCount())
+                        : singleRow || listMode ? lastFocused : lastFocused % COLUMNS);
                 return true;
             }
             int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : firstTopButton().getId();
             int leftButton = rtlMenuBar ? R.id.btnSettings : firstButton;
             int rightButton = rtlMenuBar ? firstButton : R.id.btnSettings;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && circleList && v.getId() == leftButton) {
+                // circle_list: Left on the first top button goes back to the chosen app, like Down.
+                focusTile(ListMode.afterHeaderDown(lastFocused, adapter.appCount()));
+                return true;
+            }
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return v.getId() == leftButton;
             return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && v.getId() == rightButton;
         };
@@ -998,7 +1052,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean openInputsIfAsked(Intent intent) {
         if (intent == null || !ACTION_VIEW_INPUTS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
-        View anchor = topMenu ? findViewById(R.id.btnSettings) : btnInputs;
+        View anchor = topMenu || listMode ? findViewById(R.id.btnSettings) : btnInputs;
         if (anchor.getVisibility() != View.VISIBLE) return true;
         if (anchor.isLaidOut()) {
             // Android 9 delivers a new intent to a paused activity with a brief resume and pause around it, and
@@ -1062,6 +1116,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (gameDay != null && !stopped) gameDay.read();
         grid.scrollToPosition(0);
         lastFocused = 0;
+        headerFocusId = 0;
         lastFocusedKey = adapter.getItemCount() > 0 ? adapter.keyAt(0) : null;
         if (stopped) {
             tileRefresh.onHomeAgain();
@@ -1281,10 +1336,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         final boolean returnToLibrary = libraryFocusPending;
         final String returnKey = lastFocusedKey;
         final int returnSlot = lastFocused;
+        // Read now, not in the post: a new activity gets an initial focus on a top button before the post runs, and
+        // the focus listener would overwrite the id with that button's.
+        final int returnHeader = listMode ? headerFocusId : 0;
         grid.post(() -> {
             int pos = adapter.positionOf(returnKey);
             if (returnToLibrary || libraryFocusPending) focusLibrary();
-            else focusTile(pos >= 0 ? pos : returnSlot);
+            else if (ListMode.returnTo(returnHeader, pos, returnSlot, adapter.appCount()) == ListMode.HEADER) {
+                findViewById(returnHeader).requestFocus();   // a top button had focus (the gear, after the TV settings)
+            } else focusTile(ListMode.returnTo(pos, returnSlot, adapter.appCount()));
             tilesReady = true;
             startPendingSettingsReorder();
             showCardPrompt();
@@ -1381,6 +1441,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private final ViewTreeObserver.OnGlobalFocusChangeListener glassFocusListener = (oldF, newF) -> {
         boolean onTile = newF != null && newF.getId() == R.id.card;
         if (!onTile) hideGlass();
+        // list_mode: remember whether a top button (not a row) has focus, for restoreFocus.
+        if (this.listMode && newF != null) this.headerFocusId = ListMode.headerFocusAfter(newF.getId(), R.id.btnSettings, R.id.btnLibraryTop);
     };
 
     @Override
@@ -1458,6 +1520,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
         }
         if (!reordering) return super.dispatchKeyEvent(event);
+        if (circleList) return dispatchCircleMove(event);
         if (dockEditing) return dispatchDockEdit(event);
         boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
         int code = event.getKeyCode();
@@ -1501,6 +1564,64 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return true;
         }
         return super.dispatchKeyEvent(event);   // arrows navigate; OK on a top-bar pill works as usual
+    }
+
+    /**
+     * circle_list, while an app is carried (tile menu > Move): Up and Down move it one place in the order and never past
+     * either end, OK saves (Order.save, through endReorder), Back puts the order back as it was and leaves. Left and
+     * Right do nothing; other keys (volume, Home) pass through.
+     */
+    private boolean dispatchCircleMove(KeyEvent event) {
+        int code = event.getKeyCode();
+        boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+        if (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN) {
+            if (down && movingKey != null) moveCircle(code == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1);
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) return true;
+        if (isOkKey(code)) {
+            if (!down && !event.isCanceled()) confirmCircleMove();
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE) {
+            if (!down) cancelCircleMove();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    private void moveCircle(int direction) {
+        int from = adapter.positionOf(movingKey);
+        int to = CircleList.moveTarget(from, adapter.movableCount(), direction);
+        if (to == from) return;   // at an end: nothing moves, the order does not wrap
+        String key = movingKey;
+        adapter.move(from, to);
+        // Same bookkeeping as moveBy: where the app lands decides whether it counts as docked (fill_dock false only).
+        if (to < COLUMNS) dockInSession.add(key);
+        else dockInSession.remove(key);
+        lastFocused = to;
+        lastFocusedKey = key;
+        // The carried app stays at the chosen place; its neighbour changes sides.
+        circleLayout.select(to, false);
+        circleLayout.focusWhenLaidOut();
+        grid.playSoundEffect(direction < 0 ? SoundEffectConstants.NAVIGATION_UP : SoundEffectConstants.NAVIGATION_DOWN);
+    }
+
+    private void confirmCircleMove() {
+        String key = movingKey;
+        endReorder();   // saves when the order changed
+        circleLayout.select(adapter.positionOf(key), false);
+        focusCircleRow();
+    }
+
+    private void cancelCircleMove() {
+        String key = movingKey;
+        if (orderAtStart != null) {
+            for (int[] move : CircleList.restoreMoves(adapter.movableKeys(), orderAtStart)) adapter.move(move[0], move[1]);
+        }
+        endReorder();   // the order equals the one at the start now: nothing is saved
+        circleLayout.select(adapter.positionOf(key), false);
+        circleLayout.focusWhenLaidOut();
     }
 
     /** Adapter position of the focused tile, or -1 when focus is not on a tile. */
@@ -1739,6 +1860,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * afterwards if the moved tile itself ends up off screen.
      */
     private void keepScroll(Runnable change) {
+        if (circleList) {   // the arc does not scroll; focusTile chooses the moved app's row afterwards
+            change.run();
+            return;
+        }
         GridLayoutManager lm = (GridLayoutManager) grid.getLayoutManager();
         int first = lm.findFirstVisibleItemPosition();
         View firstView = first != RecyclerView.NO_POSITION ? lm.findViewByPosition(first) : null;
@@ -1809,7 +1934,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             grid.post(() -> {
                 if (libraryFocusPending && appLibrary == null && hasWindowFocus() && !isFinishing()) focusLibrary();
             });
-        }, libraryExcludedApps);
+        }, libraryExcludedApps, listMode, adapter::packagesInOrder);
         openPopup = appLibrary.popup;
         appLibrary.show();
     }
@@ -1824,6 +1949,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             card.post(() -> {
                 if (card.isFocused() && card.getWidth() > 0) onTileFocused(position, card);
             });
+            return;
+        }
+        if (listMode) {
+            // No glass in the list: the focused symbol's name is the whole highlight. Only bring the row on screen.
+            hideGlass();
+            View listRow = (View) card.getParent();
+            revealRect.set(0, 0, listRow.getWidth(), listRow.getHeight());
+            grid.requestChildRectangleOnScreen(listRow, revealRect, reducedMotion);
             return;
         }
         // Tile rect in root coordinates, using layout positions (ignores the scale animation).
@@ -1902,7 +2035,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Refits the glass to the focused holder once the grid layout and tile dimensions settle. */
     private void refitGlass() {
-        if (isDestroyed() || adapter.appCount() == 0 || libraryFocusPending) return;
+        if (isDestroyed() || adapter.appCount() == 0 || libraryFocusPending || listMode) return;   // the list has no glass
         int pos = Math.max(0, Math.min(lastFocused, adapter.appCount() - 1));
         RecyclerView.ViewHolder vh = grid.findViewHolderForAdapterPosition(pos);
         View card = vh == null ? null : vh.itemView.findViewById(R.id.card);
@@ -2445,6 +2578,35 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     public boolean onTileVerticalKey(int position, int keyCode) {
         int count = adapter.appCount();
         int target;
+        if (circleList) {
+            // The arc has no ends: Up and Down turn it by one place (the press is dropped while a held key is further
+            // ahead than the turn can follow), Right goes to the top buttons, Left does nothing, as in the straight list.
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (circleLayout.step(keyCode == KeyEvent.KEYCODE_DPAD_UP ? -1 : 1)) {
+                    focusCircleRow();
+                    grid.playSoundEffect(keyCode == KeyEvent.KEYCODE_DPAD_UP
+                            ? SoundEffectConstants.NAVIGATION_UP : SoundEffectConstants.NAVIGATION_DOWN);
+                }
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                (btnInputs.getVisibility() == View.VISIBLE ? btnInputs : firstTopButton()).requestFocus();
+            }
+            return true;
+        }
+        if (listMode && (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN)) {
+            // One row at a time. Up on the first row goes to the top bar by name (the focus search would pick from a
+            // list on the left and pills on the right); Down on the last app reaches the library row, then stays.
+            int next = ListMode.step(position, count, keyCode == KeyEvent.KEYCODE_DPAD_UP);
+            if (next == ListMode.TOP_BAR) {
+                (btnInputs.getVisibility() == View.VISIBLE ? btnInputs : firstTopButton()).requestFocus();
+            } else if (next == ListMode.END) {
+                if (adapter.isLibraryAt(count)) focusLibrary();
+            } else {
+                focusTile(next);
+                grid.playSoundEffect(keyCode == KeyEvent.KEYCODE_DPAD_UP
+                        ? SoundEffectConstants.NAVIGATION_UP : SoundEffectConstants.NAVIGATION_DOWN);
+            }
+            return true;
+        }
         if (singleRow) {
             // One row: Up leaves for the top bar, Down has nowhere to go, and Left/Right walk the whole row,
             // stopping at its two ends (the default focus search scrolls the row to the next tile).
@@ -2680,12 +2842,34 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
+    /**
+     * circle_list: focus goes to the row of the chosen app. A row that the arc has not laid out yet (a jump from far away,
+     * after Home or a return from an app) is focused as soon as the layout has it; one that is still missing then is an
+     * error, not a silent loss of focus (CircleLayoutManager.focusWhenLaidOut).
+     */
+    private void focusCircleRow() {
+        int chosen = circleLayout.selected();
+        RecyclerView.ViewHolder vh = grid.findViewHolderForAdapterPosition(chosen);
+        if (vh == null) {
+            circleLayout.focusWhenLaidOut();
+            return;
+        }
+        View card = vh.itemView.findViewById(R.id.card);
+        if (card.isFocused()) onTileFocused(chosen, card);   // already focused (back from an app): no focus change fires
+        else card.requestFocus();
+    }
+
     private void focusTile(int position) {
         libraryFocusPending = false;
         cancelPendingFocusScroll();
         if (adapter.appCount() == 0) {
             if (adapter.isLibraryAt(0)) focusLibrary();
             else firstTopButton().requestFocus();
+            return;
+        }
+        if (circleList) {
+            circleLayout.select(position, true);
+            focusCircleRow();
             return;
         }
         final int pos = adapter.focusablePosition(Math.max(0, Math.min(position, adapter.appCount() - 1)));
@@ -3060,6 +3244,48 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** The open library came from the VPN pill (vpn_pill, no VPN app): closing it returns there while the pill still shows. */
     private boolean libraryFromVpnPill;
 
+    /**
+     * list_mode darkens nothing; the clock, the date, the line between them and the signs of the two round buttons carry a
+     * soft black shadow instead (the names and the list symbols get theirs in AppAdapter). Text uses setShadowLayer; the
+     * line and the signs get a bitmap made once here from their own shape (ShadowIcons), 39 KB for the three (6,336 B and 2 x 16,384 B). The
+     * focused button keeps its dark sign without a shadow.
+     */
+    private void applyListShadows() {
+        float scale = density / 2f;
+        float radius = ListMode.SHADOW_RADIUS_PX * scale, dy = ListMode.SHADOW_DY_PX * scale;
+        for (int id : new int[]{R.id.clock, R.id.ampm, R.id.date, R.id.shamsiDate, R.id.lunarDate}) {
+            ((TextView) findViewById(id)).setShadowLayer(radius, 0f, dy, ListMode.SHADOW_COLOR);
+        }
+        // The shadows reach past the views' own edges: the header's containers must not clip them.
+        View divider = findViewById(R.id.clockDivider);
+        divider.setBackground(ShadowIcons.make(new ColorDrawable(0xFFFFFFFF), new ColorDrawable(0x33FFFFFF),
+                Math.round(density), Math.round(26 * density), scale));
+        for (View view : new View[]{findViewById(R.id.clock), divider, findViewById(R.id.date)}) {
+            for (android.view.ViewParent p = view.getParent(); p instanceof ViewGroup && p != findViewById(R.id.topButtons)
+                    && ((View) p).getId() != R.id.root; p = p.getParent()) {
+                ((ViewGroup) p).setClipChildren(false);
+            }
+        }
+        shadowButtonSign(btnLibraryTop, scale);
+        shadowButtonSign(findViewById(R.id.btnSettings), scale);
+    }
+
+    private void shadowButtonSign(View button, float scale) {
+        TextView pill = (TextView) button;
+        Drawable sign = pill.getCompoundDrawablesRelative()[0];
+        if (sign == null) return;
+        int w = sign.getIntrinsicWidth(), h = sign.getIntrinsicHeight();
+        Drawable white = sign.getConstantState().newDrawable().mutate();
+        white.setTint(0xFFFFFFFF);
+        Drawable dark = sign.getConstantState().newDrawable().mutate();
+        dark.setTint(0xFF111111);
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_focused}, dark);
+        states.addState(new int[]{}, ShadowIcons.make(white, white, w, h, scale));
+        pill.setCompoundDrawableTintList(null);
+        pill.setCompoundDrawablesRelativeWithIntrinsicBounds(states, null, null, null);
+    }
+
     /** Turns a labelled top pill into the round TopButtonIcon shape: no text, the icon centred by even padding. */
     private void makeIconOnly(TextView pill) {
         pill.setContentDescription(pill.getText());
@@ -3226,6 +3452,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             btnInputs.setVisibility(View.GONE);
             return;
         }
+        btnInputs.setVisibility(inputsAvailable() ? View.VISIBLE : View.GONE);
+    }
+
+    /** True when the Inputs menu would have something to list (the pill's rule, and the Inputs row of list_mode's menu). */
+    private boolean inputsAvailable() {
         boolean any = liveTvIntent() != null || !sourcePanelService.isEmpty()
                 || (coocaaSources && !CoocaaSources.list(this).isEmpty());
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
@@ -3238,7 +3469,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 }
             }
         }
-        btnInputs.setVisibility(any ? View.VISIBLE : View.GONE);
+        return any;
     }
 
     /** boot_to_live_tv, or the Open on start app: the first time Home comes up after the TV starts, open that app
@@ -3424,7 +3655,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // top_menu: the pill is gone, so the list hangs under the gear, growing inward from the right.
         // Read the switch, not the pill: show_inputs_pill=false hides the pill too, and there the list
         // keeps its usual place.
-        boolean underGear = topMenu;
+        boolean underGear = topMenu || listMode;   // list_mode has no Inputs pill either: Inputs is a row of the gear's menu
         View anchor = findViewById(underGear ? R.id.btnSettings : R.id.btnInputs);
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
         LinearLayout rows = panel.findViewById(R.id.rows);
@@ -3724,6 +3955,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
         LinearLayout rows = panel.findViewById(R.id.rows);
         PopupWindow popup = glassPopup(panel, (int) (200 * density));
+        if (listMode) {
+            // list_mode has neither the Inputs nor the network pill: both are the first rows here, as in the top menu.
+            // The network row reads the hidden pill's text, which updateWifiLabel keeps writing; Inputs opens its list
+            // (hanging under the gear) once this menu has closed. No Inputs to list: no row, as no pill.
+            if (inputsAvailable()) addSettingsMenuRow(rows, popup, getString(R.string.inputs), () -> root.post(this::showInputs));
+            CharSequence network = wifiIconOnly ? btnWifi.getContentDescription() : btnWifi.getText();
+            addSettingsMenuRow(rows, popup, TextUtils.isEmpty(network) ? getString(R.string.quick_network) : network,
+                    this::openNetworkPill);
+            addSeparator(rows);
+        }
         if (!launcherSettingsButton) addSettingsMenuRow(rows, popup, R.string.launcher_settings, () -> startActivityForResult(
                 new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
         // Firmware that ships its own settings app next to the AOSP one (Xiaomi China is one): the
@@ -3735,9 +3976,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 if (vendor != null) open(vendor);
             });
         }
-        if (moduleCards) addSettingsMenuRow(rows, popup, R.string.module_cards, this::showModuleCards);
+        if (SettingsMenu.menuShowsModuleCards(moduleCards, circleList, cards.size(), CardFeature.working())) {
+            addSettingsMenuRow(rows, popup, R.string.module_cards, this::showModuleCards);
+        }
         if (dockRow) addSettingsMenuRow(rows, popup, R.string.dock_edit, this::startDockEdit);
-        addSettingsMenuRow(rows, popup, R.string.reorder, this::toggleReorder);
+        if (SettingsMenu.menuShowsReorder(circleList)) addSettingsMenuRow(rows, popup, R.string.reorder, this::toggleReorder);
         // A launcher may not restart the TV itself; the Home key helper can open the system power menu instead.
         if (HomeKeyService.canOpenPowerMenu()) addSettingsMenuRow(rows, popup, R.string.power_menu, HomeKeyService::openPowerMenu);
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
@@ -3852,26 +4095,38 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
         LinearLayout rows = panel.findViewById(R.id.rows);
         PopupWindow popup = glassPopup(panel, (int) (200 * density));
-        if (dockRow && position < adapter.movableCount()) {
-            boolean inDock = position < COLUMNS;
-            addSettingsMenuRow(rows, popup, inDock ? R.string.tile_replace_in_dock : R.string.tile_add_to_dock,
-                    () -> startDockEditFor(key, inDock));
-        }
-        if (position < adapter.movableCount()) addSettingsMenuRow(rows, popup, R.string.tile_move, () -> {
-            if (!beginReorder()) return;
-            int at = adapter.positionOf(key);   // beginReorder can rebuild the tiles
-            if (at < 0) return;
-            focusTile(at);
-            pickUp(at);
-            Toast.makeText(this, R.string.reorder_hint, Toast.LENGTH_LONG).show();
-        });
-        if (appLibraryEnabled) addSettingsMenuRow(rows, popup, R.string.library_remove_shortcut, () -> {
-            if (LibraryApps.save(this, pkg, false)) reloadApps(false);
-            else Toast.makeText(this, R.string.library_save_failed, Toast.LENGTH_LONG).show();
-        });
         // Some firmware has no App info page at all; a row that only toasts "can't open" helps nobody.
         Intent info = SystemSettings.appInfo(this, pkg);
-        if (info != null) addSettingsMenuRow(rows, popup, R.string.library_app_info, () -> open(info));
+        for (int menuRow : TileMenu.rows(dockRow, position < adapter.movableCount(), appLibraryEnabled, info != null)) {
+            switch (menuRow) {
+                case TileMenu.DOCK: {
+                    boolean inDock = position < COLUMNS;
+                    addSettingsMenuRow(rows, popup, inDock ? R.string.tile_replace_in_dock : R.string.tile_add_to_dock,
+                            () -> startDockEditFor(key, inDock));
+                    break;
+                }
+                case TileMenu.MOVE:
+                    addSettingsMenuRow(rows, popup, R.string.tile_move, () -> {
+                        if (!beginReorder()) return;
+                        int at = adapter.positionOf(key);   // beginReorder can rebuild the tiles
+                        if (at < 0) return;
+                        focusTile(at);
+                        pickUp(at);
+                        Toast.makeText(this, circleList ? R.string.circle_move_hint : R.string.reorder_hint,
+                                Toast.LENGTH_LONG).show();
+                    });
+                    break;
+                case TileMenu.REMOVE:
+                    addSettingsMenuRow(rows, popup, R.string.library_remove_shortcut, () -> {
+                        if (LibraryApps.save(this, pkg, false)) reloadApps(false);
+                        else Toast.makeText(this, R.string.library_save_failed, Toast.LENGTH_LONG).show();
+                    });
+                    break;
+                default:
+                    addSettingsMenuRow(rows, popup, R.string.library_app_info, () -> open(info));
+                    break;
+            }
+        }
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
         popup.setWidth(Math.max((int) (200 * density), panel.getMeasuredWidth()));
         // Dock tiles sit near the bottom of the screen: open the menu above the tile when it would not fit below.
@@ -3893,6 +4148,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private void addSettingsMenuRow(LinearLayout rows, PopupWindow popup, int title, Runnable action) {
+        addSettingsMenuRow(rows, popup, getString(title), action);
+    }
+
+    private void addSettingsMenuRow(LinearLayout rows, PopupWindow popup, CharSequence title, Runnable action) {
         View row = getLayoutInflater().inflate(R.layout.item_input, rows, false);
         row.findViewById(R.id.icon).setVisibility(View.GONE);
         row.findViewById(R.id.dot).setVisibility(View.GONE);

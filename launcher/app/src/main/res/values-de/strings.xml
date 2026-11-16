@@ -65,6 +65,9 @@
     <string name="library_recent">Neu · Zum Startbildschirm</string>
     <string name="library_hint_add">Drücken: zu Start hinzufügen · Halten: Optionen</string>
     <string name="library_hint_open">Drücken: öffnen · Halten: Optionen</string>
+    <string name="circle_move_hint">Hoch / Runter: App verschieben · OK: speichern · Zurück: abbrechen</string>
+    <string name="library_move">Verschieben</string>
+    <string name="library_move_hint">Links / Rechts: verschieben · OK: hier ablegen · Zurück: abbrechen</string>
     <plurals name="library_app_count">
         <item quantity="one">%1$d App</item>
         <item quantity="other">%1$d Apps</item>
@@ -74,4 +77,27 @@
     <string name="clock_format_system">System</string>
     <string name="clock_format_12">12 Stunden</string>
     <string name="clock_format_24">24 Stunden</string>
+    <string name="wallpaper_random">Zufällig abspielen</string>
+    <string name="dim_label">Abdunkeln</string>
+    <string name="dim_state">Abdunkeln: %1$s</string>
+    <string name="dim_switch_state">Abdunkeln: %1$s</string>
+    <string name="dim_value_state">Wert: %1$d %%</string>
+    <string name="dim_percent">%1$d %%</string>
+    <string name="dim_permission_missing">Berechtigung fehlt: \"Über anderen Apps anzeigen\" ist für diese App nicht erlaubt.</string>
+    <string name="dim_error_boot">Zuletzt fehlgeschlagen: Der Fernseher meldet seinen Startzähler nicht.</string>
+    <string name="dim_error_service">Zuletzt fehlgeschlagen: Die Abdunkel-Schicht konnte nicht gestartet werden. Siehe Protokoll.</string>
+    <string name="dim_layer_active">Die Schicht ist an.</string>
+    <string name="dim_keep">Einstellungen merken</string>
+    <string name="dim_hint">Zu dunkel? Hier die Taste Links drücken, bis der Wert klein ist. Ohne Haken bei \"Einstellungen merken\" geht auch: Fernseher aus- und wieder einschalten oder Netzstecker ziehen; dann steht der Schalter nach Standby und Neustart wieder auf Aus, der Wert bleibt. Mit Haken bleibt die Schicht nach Standby an und kommt nach einem Neustart zurück. Links und Rechts ändern den Wert um 1 Prozent, höchstens 95; Taste halten, um durchzulaufen.</string>
+    <string name="home_settings">Standard-Startbildschirm wählen</string>
+    <string name="home_settings_help">Wähle deinen ursprünglichen Startbildschirm, um CleanYourTV nicht mehr als Home zu verwenden, oder CleanYourTV, um zurückzuwechseln. Der ursprüngliche Launcher muss aktiviert sein und dein Fernseher muss eine Home-Auswahl anbieten; nutze zuerst das Wiederherstellungsskript, falls er deaktiviert wurde.</string>
+    <string name="rows_below_dock_label">Zeilen unter dem Dock</string>
+    <string name="wallpaper_label">Hintergrund</string>
+    <string name="wallpaper_state">Hintergrund: %1$s</string>
+    <string name="wallpaper_none">Keiner</string>
+    <string name="wallpaper_applied">Hintergrund geändert</string>
+    <string name="wallpaper_theme_default">Vorgabe des Designs</string>
+    <string name="quick_network">Netzwerk</string>
+    <string name="module_cards">Modulkarten</string>
+    <string name="no_module_cards">Keine Modulkarten installiert</string>
 </resources>

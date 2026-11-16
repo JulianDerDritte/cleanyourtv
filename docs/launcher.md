@@ -59,6 +59,11 @@ The launcher's own page has these rows, top to bottom:
 - **Wallpaper**: one picture from the theme's collection (or its `wallpaper.jpg`), **None**, or **Theme
   default**. A pick holds that picture and stops the rotation until you choose Theme default, press
   Follow theme, or push the theme again.
+- **Dim screen** opens a submenu: an on/off button, a tick to keep the setting after a restart, and a value from 0
+  to 95 percent. It draws a black layer over every app, so it needs the permission to display over other apps; it
+  does not save power.
+
+  <img src="switches/dim-settings.jpg" width="320" alt="Launcher settings with the Dim screen row"> <img src="switches/dim-screen.jpg" width="320" alt="the Dim screen submenu">
 - **Animations** on or off, and **Advanced effects** (tile lift, icon zoom and smooth ambient-colour
   transitions; they may use more memory) once animations are on.
 - **Open on start**, only with `open_on_start_choice`: Off, or an app that opens instead of Home the first

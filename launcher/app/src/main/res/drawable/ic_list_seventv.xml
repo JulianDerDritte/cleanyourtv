@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- list_mode symbol: word mark 7TV, white.
+     Package: de.prosiebensat1digital.seventv
+     Source: drawn by hand, no template (strokes with round ends)
+     License: own drawing
+     Size is the size it is drawn at, so the ImageView centres it and does not scale it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="41.03dp"
+    android:height="20dp"
+    android:viewportWidth="41.03"
+    android:viewportHeight="20">
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.76"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M1.38 1.38 L10.86 1.38 L4.48 18.62 M14.31 1.38 L25 1.38 M19.66 1.38 L19.66 18.62 M28.45 1.38 L34.05 18.62 L39.66 1.38" />
+</vector>

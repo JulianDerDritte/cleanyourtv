@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- list_mode symbol: MagentaTV (the T), white.
+     Package: de.telekom.magentatv.atv
+     Source: Simple Icons 16.36.0, icons/deutschetelekom.svg
+     License: CC0 1.0 (Simple Icons)
+     Size is the size it is drawn at, so the ImageView centres it and does not scale it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6.722 15.84 h-4.8 v-4.8 h4.791 v4.8 z M1.922 0 v8.16 H3.36 v-0.236 c0 -3.844 2.159 -6.24 6.239 -6.24 h0.237 v17.279 c0 2.396 -0.957 3.36 -3.36 3.36 h-0.72 V24 h12.478 v-1.676 h-0.72 c-2.395 0 -3.36 -0.957 -3.36 -3.361 V1.676 h0.237 c4.08 0 6.239 2.396 6.239 6.24 v0.236 h1.439 V0 Z M17.278 15.84 h4.8 v-4.8 h-4.791 v4.8 z" />
+</vector>

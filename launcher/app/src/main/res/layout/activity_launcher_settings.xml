@@ -19,24 +19,28 @@
             android:layout_height="wrap_content"
             android:text="@string/launcher_settings"
             android:textColor="#FFFFFFFF"
+            android:fontFamily="@string/font_medium"
             android:textSize="34sp" />
 
         <TextView
             android:id="@+id/reorderChoice"
             style="@style/SettingsRow"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="24dp"
             android:text="@string/reorder"
             android:visibility="gone" />
 
         <TextView
+            android:id="@+id/columnsLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="24dp"
             android:text="@string/columns_label"
             android:textColor="#FFFFFFFF"
+            android:fontFamily="@string/font_medium"
             android:textSize="20sp" />
 
         <LinearLayout
+            android:id="@+id/columnsRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
@@ -45,18 +49,21 @@
             <TextView android:id="@+id/columns4" style="@style/SettingsColumnChoice" android:text="4" />
             <TextView android:id="@+id/columns5" style="@style/SettingsColumnChoice" android:text="5" />
             <TextView android:id="@+id/columns6" style="@style/SettingsColumnChoice" android:text="6" />
-            <TextView android:id="@+id/columns7" style="@style/SettingsColumnChoice" android:text="7" />
+            <TextView android:id="@+id/columns7" style="@style/SettingsColumnChoice" android:layout_marginEnd="0dp" android:text="7" />
         </LinearLayout>
 
         <TextView
+            android:id="@+id/rowsLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="24dp"
             android:text="@string/rows_below_dock_label"
             android:textColor="#FFFFFFFF"
+            android:fontFamily="@string/font_medium"
             android:textSize="20sp" />
 
         <LinearLayout
+            android:id="@+id/rowsRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
@@ -65,18 +72,21 @@
             <TextView android:id="@+id/rows0" style="@style/SettingsColumnChoice" android:text="0" />
             <TextView android:id="@+id/rows1" style="@style/SettingsColumnChoice" android:text="1" />
             <TextView android:id="@+id/rows2" style="@style/SettingsColumnChoice" android:text="2" />
-            <TextView android:id="@+id/rows3" style="@style/SettingsColumnChoice" android:text="3" />
+            <TextView android:id="@+id/rows3" style="@style/SettingsColumnChoice" android:layout_marginEnd="0dp" android:text="3" />
         </LinearLayout>
 
         <TextView
+            android:id="@+id/dockLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="24dp"
             android:text="@string/dock_opacity_label"
             android:textColor="#FFFFFFFF"
+            android:fontFamily="@string/font_medium"
             android:textSize="20sp" />
 
         <LinearLayout
+            android:id="@+id/dockRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
@@ -85,15 +95,17 @@
             <TextView android:id="@+id/dock100" style="@style/SettingsColumnChoice" android:text="100%" />
             <TextView android:id="@+id/dock70" style="@style/SettingsColumnChoice" android:text="70%" />
             <TextView android:id="@+id/dock50" style="@style/SettingsColumnChoice" android:text="50%" />
-            <TextView android:id="@+id/dock30" style="@style/SettingsColumnChoice" android:text="30%" />
+            <TextView android:id="@+id/dock30" style="@style/SettingsColumnChoice" android:layout_marginEnd="0dp" android:text="30%" />
         </LinearLayout>
 
         <TextView
+            android:id="@+id/clockLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="24dp"
             android:text="@string/dream_name"
             android:textColor="#FFFFFFFF"
+            android:fontFamily="@string/font_medium"
             android:textSize="20sp" />
 
         <LinearLayout
@@ -104,18 +116,23 @@
 
             <TextView android:id="@+id/clockSystem" style="@style/SettingsColumnChoice" android:text="@string/clock_format_system" />
             <TextView android:id="@+id/clock12" style="@style/SettingsColumnChoice" android:text="@string/clock_format_12" />
-            <TextView android:id="@+id/clock24" style="@style/SettingsColumnChoice" android:text="@string/clock_format_24" />
+            <TextView android:id="@+id/clock24" style="@style/SettingsColumnChoice" android:layout_marginEnd="0dp" android:text="@string/clock_format_24" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/wallpaperChoice"
             style="@style/SettingsRow"
-            android:layout_marginTop="28dp" />
+            android:layout_marginTop="24dp" />
+
+        <TextView
+            android:id="@+id/dimChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
 
         <TextView
             android:id="@+id/animationsChoice"
             style="@style/SettingsRow"
-            android:layout_marginTop="28dp" />
+            android:layout_marginTop="10dp" />
 
         <TextView
             android:id="@+id/advancedChoice"
@@ -123,51 +140,55 @@
             android:layout_marginTop="10dp" />
 
         <TextView
+            android:id="@+id/advancedHint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:text="@string/advanced_effects_warning"
             android:textColor="#FFACB8C1"
+            android:fontFamily="@string/font_regular"
             android:textSize="14sp" />
 
         <TextView
             android:id="@+id/openOnStartChoice"
             style="@style/SettingsRow"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="24dp"
             android:visibility="gone" />
 
         <TextView
             android:id="@+id/followThemeChoice"
             style="@style/SettingsRow"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="24dp"
             android:text="@string/follow_theme" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
+            android:layout_marginTop="6dp"
             android:text="@string/follow_theme_hint"
             android:textColor="#FFACB8C1"
+            android:fontFamily="@string/font_regular"
             android:textSize="14sp" />
 
         <TextView
             android:id="@+id/defaultHomeChoice"
             style="@style/SettingsRow"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="24dp"
             android:text="@string/home_settings" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
+            android:layout_marginTop="6dp"
             android:text="@string/home_settings_help"
             android:textColor="#FFACB8C1"
+            android:fontFamily="@string/font_regular"
             android:textSize="14sp" />
 
         <TextView
             android:id="@+id/tvSettingsChoice"
             style="@style/SettingsRow"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="24dp"
             android:text="@string/tv_settings" />
     </LinearLayout>
 </ScrollView>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- list_mode symbol: word mark WOW, white.
+     Package: de.sky.online
+     Source: drawn by hand, no template (strokes with round ends)
+     License: own drawing
+     Size is the size it is drawn at, so the ImageView centres it and does not scale it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="17.51dp"
+    android:viewportWidth="48"
+    android:viewportHeight="17.51">
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.42"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M1.21 1.21 L4.98 16.3 L8.75 5.74 L12.53 16.3 L16.3 1.21 M28.68 8.75 L28.56 10.43 L28.22 12.03 L27.66 13.46 L26.92 14.66 L26.03 15.55 L25.04 16.11 L24 16.3 L22.96 16.11 L21.97 15.55 L21.08 14.66 L20.34 13.46 L19.78 12.03 L19.44 10.43 L19.32 8.75 L19.44 7.08 L19.78 5.48 L20.34 4.05 L21.08 2.85 L21.97 1.95 L22.96 1.4 L24 1.21 L25.04 1.4 L26.03 1.95 L26.92 2.85 L27.66 4.05 L28.22 5.48 L28.56 7.08 L28.68 8.75 M31.7 1.21 L35.47 16.3 L39.25 5.74 L43.02 16.3 L46.79 1.21" />
+</vector>
